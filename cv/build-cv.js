@@ -2,18 +2,18 @@ const fs = require('fs');
 const path = require('path');
 const lib = require('./lib');
 
-const { md, esc, inlineToPlain, runPdf, fillTemplate } = lib;
+const { md, esc, inlineToPlain, parseMd, renderHeader, findChrome, runPdf, fillTemplate } = lib;
 
 // Resolve paths relative to this script.
 const CV_DIR = __dirname;
-const TEMPLATE_PATH = path.join(CV_DIR, 'design', 'template-ats.html');
-const TMP_HTML = path.join(CV_DIR, 'design', '.tmp_cv_ats.html');
+const TEMPLATE_PATH = path.join(CV_DIR, 'design', 'template.html');
+const TMP_HTML = path.join(CV_DIR, 'design', '.tmp_cv.html');
 
 const MAX_PAGES = 2;
 
 // ---------------------------------------------------------------
 // Markdown section heading -> slot + standard ATS heading.
-// Keys match the markdown contract used by build-cv.js.
+// Keys match the markdown contract (see cv-tailor skill).
 // ---------------------------------------------------------------
 const SECTIONS = {
   'Executive Profile': { slot: 'summary', title: 'Summary' },
@@ -22,9 +22,6 @@ const SECTIONS = {
   'Education & Certifications': { slot: 'education', title: 'Education & Certifications' },
   'Community Leadership & Tech Advocacy': { slot: 'community', title: 'Volunteer Experience' },
 };
-
-// Standard labels recognised by parsers (contact keys come from the md).
-const CONTACT_ORDER = ['location', 'cell', 'phone', 'email', 'linkedin', 'github'];
 
 // ---------------------------------------------------------------
 // Render fragments (HTML strings) from structured data
@@ -36,35 +33,6 @@ function sectionTitle(text) {
 function bullets(items) {
   const lis = items.map((it) => `  <li>${md.renderInline(it)}</li>`).join('\n');
   return `<ul>\n${lis}\n</ul>`;
-}
-
-// Show the full URL as visible text so parsers capture it even without the link.
-function visibleUrl(href) {
-  return href.replace(/^https?:\/\//i, '').replace(/^www\./i, '').replace(/\/+$/, '');
-}
-
-function renderHeader(data) {
-  const name = esc(inlineToPlain(data.name));
-  const headline = esc(inlineToPlain(data.headline));
-
-  const contact = [...data.contact].sort((a, b) => {
-    const ia = CONTACT_ORDER.indexOf(a.key.toLowerCase());
-    const ib = CONTACT_ORDER.indexOf(b.key.toLowerCase());
-    return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
-  });
-
-  const parts = contact.map((c) => {
-    if (!c.href) return esc(c.value);
-    const isWeb = /^https?:/i.test(c.href);
-    const text = isWeb ? visibleUrl(c.href) : c.value;
-    return `<a href="${esc(c.href)}">${esc(text)}</a>`;
-  });
-
-  return (
-    `<h1 class="name">${name}</h1>\n` +
-    `<p class="headline">${headline}</p>\n` +
-    `<p class="contact">${parts.join(' | ')}</p>`
-  );
 }
 
 function renderSummary(title, blocks) {
@@ -162,9 +130,23 @@ function countPdfPages(pdfPath) {
 }
 
 // ---------------------------------------------------------------
-// Build: returns true when the ATS PDF was generated within limits.
+// Main
 // ---------------------------------------------------------------
-function buildAts(data, mdPath, chrome) {
+function main() {
+  const input = process.argv[2];
+  if (!input) {
+    console.error('Usage: npm run cv -- <path-to-md>');
+    process.exit(1);
+  }
+
+  const mdPath = path.resolve(input);
+  if (!fs.existsSync(mdPath)) {
+    console.error('File not found: ' + mdPath);
+    process.exit(1);
+  }
+
+  const data = parseMd(fs.readFileSync(mdPath, 'utf8'));
+
   const fragments = {
     TITLE: `${inlineToPlain(data.name)} — ${inlineToPlain(data.headline)}`,
     HEADER: renderHeader(data),
@@ -184,33 +166,38 @@ function buildAts(data, mdPath, chrome) {
   const html = fillTemplate(template, fragments);
   fs.writeFileSync(TMP_HTML, html, 'utf8');
 
-  const outPdf = mdPath.replace(/\.md$/i, '-ats.pdf');
+  const chrome = findChrome();
+  if (!chrome) {
+    console.error('Chrome/Edge not found. Set CHROME_PATH env var.');
+    process.exit(1);
+  }
+
+  const outPdf = mdPath.replace(/\.md$/i, '.pdf');
   const res = runPdf(chrome, TMP_HTML, outPdf);
 
   if (process.env.CV_KEEP_HTML) {
-    console.log('ATS HTML kept at ' + TMP_HTML);
+    console.log('HTML kept at ' + TMP_HTML);
   } else {
     fs.unlinkSync(TMP_HTML);
   }
 
   if (res.status !== 0) {
-    console.error('Chrome failed (ATS):', res.stderr || res.stdout);
-    return false;
+    console.error('Chrome failed:', res.stderr || res.stdout);
+    process.exit(res.status || 1);
   }
 
   console.log('OK -> ' + outPdf);
 
   const pages = countPdfPages(outPdf);
   if (pages === null) {
-    console.warn('No se pudo contar las paginas del PDF ATS.');
-    return true;
+    console.warn('No se pudo contar las paginas del PDF.');
+    return;
   }
   if (pages > MAX_PAGES) {
-    console.warn(`ADVERTENCIA: el CV ATS ocupa ${pages} paginas (max. ${MAX_PAGES}). Acorta el markdown.`);
-    return false;
+    console.warn(`ADVERTENCIA: el CV ocupa ${pages} paginas (max. ${MAX_PAGES}). Acorta el markdown.`);
+    process.exit(1);
   }
-  console.log(`ATS: ${pages} pagina(s) (max. ${MAX_PAGES}).`);
-  return true;
+  console.log(`${pages} pagina(s) (max. ${MAX_PAGES}).`);
 }
 
-module.exports = { buildAts };
+main();

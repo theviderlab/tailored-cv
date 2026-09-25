@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const lib = require('./lib');
 
-const { md, esc, inlineToPlain, parseMd, findChrome, runPdf, injectReporter, measureOverflow, fillTemplate } = lib;
+const { md, esc, inlineToPlain, parseMd, renderHeader, findChrome, runPdf, injectReporter, measureOverflow, fillTemplate } = lib;
 
 // Resolve paths relative to this script.
 const CV_DIR = __dirname;
@@ -12,14 +12,6 @@ const TMP_MEASURE_HTML = path.join(CV_DIR, 'design', '.tmp_measure_cover.html');
 
 const DEFAULT_CV_BASE = path.resolve(__dirname, '..', 'workspace', 'cv-base.md');
 const BLOCK_SELECTOR = '.letterhead, .letter, .signature';
-
-const ICON_MAP = {
-  email: 'email',
-  cell: 'phone',
-  linkedin: 'linkedin',
-  github: 'web',
-  location: 'location',
-};
 
 // ---------------------------------------------------------------
 // Cover letter markdown -> structured data
@@ -61,17 +53,6 @@ function parseCoverLetter(text) {
 // ---------------------------------------------------------------
 // Render fragments
 // ---------------------------------------------------------------
-function renderContact(contact) {
-  const items = contact
-    .map((c) => {
-      const icon = ICON_MAP[c.key.toLowerCase()] || 'web';
-      const inner = c.href ? `<a href="${esc(c.href)}">${esc(c.value)}</a>` : esc(c.value);
-      return `  <li data-icon="${icon}">${inner}</li>`;
-    })
-    .join('\n');
-  return `<ul class="contact">\n${items}\n</ul>`;
-}
-
 function renderBody(p) {
   const parts = [];
   if (p.salutation) parts.push(`<p class="salutation">${md.renderInline(p.salutation)}</p>`);
@@ -111,9 +92,7 @@ function main() {
 
   const fragments = {
     TITLE: `${inlineToPlain(cvData.name)} — Cover Letter`,
-    NAME: esc(cvData.name),
-    HEADLINE: esc(inlineToPlain(cvData.headline)),
-    CONTACT: renderContact(cvData.contact),
+    HEADER: renderHeader(cvData),
     BODY: renderBody(letter),
     SIGNATURE: esc(letter.signature),
   };

@@ -11,7 +11,7 @@ Adapta el CV y la cover letter a una oferta concreta y produce los PDFs listos p
 
 - **Perfil (fuente de verdad, crece con el uso):** `workspace/profile/`. Ver `workspace/profile/README.md` para qué va en cada archivo y sus reglas.
   - `skills.md`, `experience.md`, `projects.md`, `education.md`, `stories.md`, `facts.md`, `gaps.md`.
-- **CV base (selección por defecto de una página):** `workspace/cv-base.md`. Es el punto de partida de formato, orden y tono; el contenido se puede ampliar o reemplazar con lo que haya en el perfil.
+- **CV base (selección por defecto, hasta dos páginas):** `workspace/cv-base.md`. Es el punto de partida de formato, orden y tono; el contenido se puede ampliar o reemplazar con lo que haya en el perfil.
 - **Cover letter base:** `workspace/cover-letter-base.md`. Punto de partida; los bloques alternativos están en `stories.md`.
 - **Registro de postulaciones:** `workspace/applications.md`.
 - **Buenas prácticas ATS:** `docs/ats-guidelines.md`. Aplícalas al redactar o reescribir bullets, perfil y skills (sobre todo B1–B7, K1, K2). La auditoría completa del perfil la hace la skill `profile-audit`.
@@ -29,7 +29,7 @@ El CV base y la cover letter base **no se editan** salvo que el usuario lo pida.
 
 ## Contrato del markdown (obligatorio para que el build funcione)
 
-El script `cv/build-cv.js` mapea el markdown a una plantilla HTML de dos columnas. Los títulos de sección deben coincidir **exactamente** (incluidas mayúsculas y el `&`):
+El script `cv/build-cv.js` mapea el markdown a una plantilla HTML de una columna optimizada para ATS. Los títulos de sección deben coincidir **exactamente** (incluidas mayúsculas y el `&`):
 
 ```
 # <Nombre completo>
@@ -125,7 +125,7 @@ Best regards,
    - Ajusta el perfil/headline al rol y la empresa.
    - Usa SOLO información del perfil o de la conversación. Si falta algo, pregunta.
    - Redacta siguiendo `docs/ats-guidelines.md`: sigla y forma completa en la primera aparición, las keywords del aviso con la misma forma que usa el aviso, nada de afirmaciones absolutas, y métricas solo si están en el perfil.
-   - Recuerda el límite de una página del CV visual: sumar algo suele implicar quitar otra cosa.
+   - Recuerda el límite de dos páginas del CV: sumar algo suele implicar quitar otra cosa.
 
 6. **Escribe los archivos nuevos** en una subcarpeta propia de la postulación, `workspace/output/<empresa>-<rol>/` (no toques los base; crea la carpeta si no existe). Nunca escribas archivos sueltos en la raíz de `workspace/output/`:
    - `workspace/output/<empresa>-<rol>/cv-<empresa>-<rol>.md`
@@ -146,7 +146,7 @@ Best regards,
    npm run cover -- ../workspace/output/<empresa>-<rol>/cover-letter-<empresa>-<rol>.md
    ```
 
-   Cada PDF se crea junto a su `.md`, dentro de la subcarpeta de la postulación. Si alguno reporta overflow, recorta ese texto y regenera.
+   Cada PDF se crea junto a su `.md`, dentro de la subcarpeta de la postulación. Si el CV pasa de 2 páginas o la carta reporta overflow, recorta ese texto y regenera.
 
 9. **Registra la postulación** en `workspace/applications.md`: agrega una fila arriba con fecha, empresa, rol, carpeta, link del aviso (si lo hay), estado `enviada` (o `?` si el usuario no confirmó el envío) y notas breves (p. ej. idioma).
 
@@ -162,10 +162,8 @@ Best regards,
 ## Notas del build
 
 - Requiere Node (dep `markdown-it`) y Chrome/Edge instalados. `npm install` en `cv/` la primera vez.
-- `npm run cv` genera **dos PDFs** desde el mismo markdown: `<nombre>.pdf` (diseño visual de dos columnas) y `<nombre>-ats.pdf` (una columna, optimizado para ATS; plantilla `cv/design/template-ats.html` + `style-ats.css`). El ATS usa títulos estándar (Summary, Skills, Professional Experience, Education & Certifications, Volunteer Experience) sin cambiar el contrato del markdown, y puede ocupar **hasta 2 páginas**; si pasa de 2, el build termina con código 1.
-- Qué enviar: el `-ats.pdf` para portales de empleo (Workday, Greenhouse, Lever, LinkedIn Easy Apply…); el diseño visual para envíos directos a personas (email, referidos).
-- **El CV visual siempre sale en una sola página** (`.page` tiene altura fija A4 y `overflow: hidden`). Si el contenido no cabe, el build lo recorta y **termina con código 1** imprimiendo qué bloque se desborda y por cuántos px.
-- Si el build reporta overflow, **acorta el markdown** (recorta bullets o reescribe el perfil) hasta que salga limpio, antes de entregar el PDF.
+- `npm run cv` genera **un PDF** optimizado para ATS, `<nombre>.pdf`, junto al markdown (una columna; plantilla `cv/design/template.html` + `style.css`). Usa títulos estándar (Summary, Skills, Professional Experience, Education & Certifications, Volunteer Experience) sin cambiar el contrato del markdown.
+- **El CV puede ocupar hasta 2 páginas.** Si pasa de 2, el build **termina con código 1**: acorta el markdown (recorta bullets o reescribe el perfil) hasta que salga limpio, antes de entregar el PDF.
 - El build de la cover letter (`npm run cover`) usa como base de identidad `workspace/cv-base.md`; se puede sobreescribir con `CV_BASE=...` o un segundo argumento.
 - Si el usuario quiere inspeccionar el HTML intermedio: `CV_KEEP_HTML=1 npm run cv -- <md>` conserva `cv/design/.tmp_cv.html` (o `.tmp_cover.html` para la carta).
-- El diseño visual vive en `cv/design/style.css` y `cv/design/style-cover-letter.css`; no edites el CSS salvo que el usuario lo pida.
+- Los estilos viven en `cv/design/style.css` (CV) y `cv/design/style-cover-letter.css`; no edites el CSS salvo que el usuario lo pida.

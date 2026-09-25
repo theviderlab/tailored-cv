@@ -68,7 +68,7 @@ Si `workspace/` no existe, sigue el paso "Primera vez" de `cv-tailor` antes de a
    ```
    npm run cv -- ../workspace/cv-base.md
    ```
-   El CV visual tiene que salir en una página y el ATS en dos como máximo. Si hay overflow, recorta y regenera. (Los PDFs quedan junto al md en `workspace/`; avísale al usuario.)
+   El CV tiene que salir en dos páginas como máximo. Si pasa, recorta y regenera. (Los PDFs quedan junto al md en `workspace/`; avísale al usuario.)
 
 ## Formato de `workspace/profile/audit.md`
 

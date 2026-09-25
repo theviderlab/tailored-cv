@@ -141,6 +141,42 @@ function parseMd(text) {
 }
 
 // ---------------------------------------------------------------
+// Shared header (name, headline, contact line) — CV and cover letter
+// ---------------------------------------------------------------
+
+// Standard labels recognised by parsers (contact keys come from the md).
+const CONTACT_ORDER = ['location', 'cell', 'phone', 'email', 'linkedin', 'github'];
+
+// Show the full URL as visible text so parsers capture it even without the link.
+function visibleUrl(href) {
+  return href.replace(/^https?:\/\//i, '').replace(/^www\./i, '').replace(/\/+$/, '');
+}
+
+function renderHeader(data) {
+  const name = esc(inlineToPlain(data.name));
+  const headline = esc(inlineToPlain(data.headline));
+
+  const contact = [...data.contact].sort((a, b) => {
+    const ia = CONTACT_ORDER.indexOf(a.key.toLowerCase());
+    const ib = CONTACT_ORDER.indexOf(b.key.toLowerCase());
+    return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+  });
+
+  const parts = contact.map((c) => {
+    if (!c.href) return esc(c.value);
+    const isWeb = /^https?:/i.test(c.href);
+    const text = isWeb ? visibleUrl(c.href) : c.value;
+    return `<a href="${esc(c.href)}">${esc(text)}</a>`;
+  });
+
+  return (
+    `<h1 class="name">${name}</h1>\n` +
+    `<p class="headline">${headline}</p>\n` +
+    `<p class="contact">${parts.join(' | ')}</p>`
+  );
+}
+
+// ---------------------------------------------------------------
 // Chrome discovery
 // ---------------------------------------------------------------
 function findChrome() {
@@ -245,6 +281,7 @@ module.exports = {
   parseContact,
   parseExperience,
   parseMd,
+  renderHeader,
   findChrome,
   runPdf,
   makeReporter,

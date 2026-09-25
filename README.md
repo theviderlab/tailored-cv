@@ -1,6 +1,6 @@
 # tailored-cv
 
-Adapta tu CV y tu cover letter a cada aviso de empleo con un agente de IA (Claude Code u OpenCode), y genera PDFs listos para enviar: uno con diseño visual y otro optimizado para ATS.
+Adapta tu CV y tu cover letter a cada aviso de empleo con un agente de IA (Claude Code u OpenCode), y genera PDFs listos para enviar, optimizados para ATS.
 
 La idea central es un **perfil profesional que crece con el uso**: cada vez que un aviso pide algo que no está registrado, el agente te pregunta, guarda la respuesta y la reutiliza en las próximas postulaciones. Nunca inventa datos: todo lo que sale en el CV viene de tu perfil o de algo que confirmaste.
 
@@ -32,7 +32,7 @@ Generar un PDF a mano:
 
 ```sh
 cd cv
-npm run cv -- ../workspace/cv-base.md          # CV visual + versión ATS
+npm run cv -- ../workspace/cv-base.md          # CV optimizado para ATS
 npm run cover -- ../workspace/cover-letter-base.md
 ```
 

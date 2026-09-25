@@ -2,7 +2,7 @@
 
 Esta carpeta guarda **todo** lo que sabés e hiciste. Crece con el uso: cada vez que la skill `cv-tailor` pregunta por algo que no estaba registrado y la respuesta es confirmada, se agrega aquí.
 
-El CV base (`workspace/cv-base.md`) es solo **una selección de una página** de este perfil. El perfil puede tener mucho más contenido del que entra en un CV.
+El CV base (`workspace/cv-base.md`) es solo **una selección de hasta dos páginas** de este perfil. El perfil puede tener mucho más contenido del que entra en un CV.
 
 | Archivo | Qué contiene |
 |---|---|

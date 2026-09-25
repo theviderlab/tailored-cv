@@ -8,43 +8,24 @@
 </head>
 <body>
 
+<!-- Same header and typography as the CV (template.html) so both documents read as a set. -->
 <div class="page">
+  <main class="resume">
 
-  <!-- Decorative accent shapes -->
-  <span class="deco deco--left" aria-hidden="true"></span>
-  <span class="deco deco--corner" aria-hidden="true"></span>
-
-  <div class="sheet">
-
-    <!-- ================= HEADER ================= -->
     <header class="letterhead">
-      <div class="letterhead__id">
-        <h1 class="name">{{NAME}}</h1>
-        <p class="headline">{{HEADLINE}}</p>
-      </div>
-
-      <!--
-        {{CONTACT}} expects a <ul class="contact"> whose items carry an icon key:
-          <li data-icon="email"><a href="mailto:...">jane@example.com</a></li>
-        Supported keys: email, phone, linkedin, web, location.
-      -->
-      {{CONTACT}}
+      {{HEADER}}
     </header>
 
-    <!-- ================= LETTER ================= -->
-    <main class="letter">
+    <section class="letter">
       <!-- {{BODY}} expects <p class="salutation">, <p> paragraphs and <p class="signoff"> -->
       {{BODY}}
-    </main>
+    </section>
 
-    <!-- Signature -->
     <footer class="signature">
       <p class="signature__name">{{SIGNATURE}}</p>
     </footer>
 
-  </div>
-
-  <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+  </main>
 </div>
 
 </body>
