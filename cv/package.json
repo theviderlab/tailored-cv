@@ -1,0 +1,13 @@
+{
+  "name": "tailored-cv",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Markdown -> PDF CV builder (Node + Chrome headless)",
+  "scripts": {
+    "cv": "node build-cv.js",
+    "cover": "node build-cover-letter.js"
+  },
+  "dependencies": {
+    "markdown-it": "^14.1.0"
+  }
+}

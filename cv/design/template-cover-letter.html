@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{TITLE}}</title>
+  <link rel="stylesheet" href="style-cover-letter.css">
+</head>
+<body>
+
+<div class="page">
+
+  <!-- Decorative accent shapes -->
+  <span class="deco deco--left" aria-hidden="true"></span>
+  <span class="deco deco--corner" aria-hidden="true"></span>
+
+  <div class="sheet">
+
+    <!-- ================= HEADER ================= -->
+    <header class="letterhead">
+      <div class="letterhead__id">
+        <h1 class="name">{{NAME}}</h1>
+        <p class="headline">{{HEADLINE}}</p>
+      </div>
+
+      <!--
+        {{CONTACT}} expects a <ul class="contact"> whose items carry an icon key:
+          <li data-icon="email"><a href="mailto:...">jane@example.com</a></li>
+        Supported keys: email, phone, linkedin, web, location.
+      -->
+      {{CONTACT}}
+    </header>
+
+    <!-- ================= LETTER ================= -->
+    <main class="letter">
+      <!-- {{BODY}} expects <p class="salutation">, <p> paragraphs and <p class="signoff"> -->
+      {{BODY}}
+    </main>
+
+    <!-- Signature -->
+    <footer class="signature">
+      <p class="signature__name">{{SIGNATURE}}</p>
+    </footer>
+
+  </div>
+
+  <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,9 @@
+# Datos personales: perfil, CVs, postulaciones. Se versiona aparte (repo privado propio).
+workspace/
+
+# Build
+cv/node_modules/
+cv/design/.tmp_*.html
+
+# Herramientas locales
+.opencode/node_modules/

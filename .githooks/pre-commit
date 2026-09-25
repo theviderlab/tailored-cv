@@ -1,0 +1,31 @@
+#!/bin/sh
+# Bloquea commits que filtren datos personales al repo público.
+#
+# 1. Nada dentro de workspace/ (aunque se fuerce con `git add -f`).
+# 2. Ningún patrón de workspace/.private-patterns (uno por línea, regex extendida,
+#    sin distinguir mayúsculas; líneas vacías y con # se ignoran) en lo que se agrega.
+#
+# Activar una vez por clon: git config core.hooksPath .githooks
+
+if git diff --cached --name-only | grep -q '^workspace/'; then
+  echo "pre-commit: hay archivos de workspace/ en el commit. Son datos personales; sacalos con:" >&2
+  echo "  git restore --staged workspace/" >&2
+  exit 1
+fi
+
+patterns="workspace/.private-patterns"
+[ -f "$patterns" ] || exit 0
+
+list=$(mktemp)
+grep -v '^[[:space:]]*\(#\|$\)' "$patterns" > "$list"
+if [ -s "$list" ]; then
+  hits=$(git diff --cached -U0 --no-color | grep '^+' | grep -v '^+++' | grep -i -E -f "$list")
+  if [ -n "$hits" ]; then
+    rm -f "$list"
+    echo "pre-commit: el commit contiene datos de workspace/.private-patterns:" >&2
+    echo "$hits" | head -20 >&2
+    exit 1
+  fi
+fi
+rm -f "$list"
+exit 0
