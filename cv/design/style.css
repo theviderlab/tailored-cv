@@ -1,227 +1,127 @@
 /* =========================================================
-   CV — visual template
-   Two-column card layout, A4, print-ready.
+   CV — ATS-optimized variant
+   Single column, plain text flow, natural pagination (A4).
+   No columns, tables, cards, images, pseudo-element content,
+   fixed heights or hidden overflow.
    ========================================================= */
 
 :root {
-  --accent:        #fb7a50;   /* coral / orange */
-  --accent-dark:   #f2673a;
-  --page-bg:       #efefef;   /* light gray page ground */
-  --card-bg:       #ffffff;
-  --ink:           #1f1f1f;   /* body text */
-  --ink-soft:      #3c3c3c;
-  --on-accent:     #ffffff;
-  --on-accent-dim: rgba(255, 255, 255, 0.88);
+  --ink:       #111111;
+  --ink-soft:  #333333;
+  --rule:      #999999;
 
-  --radius-card:   10px;
-  --shadow-card:   0 1px 3px rgba(0, 0, 0, 0.10);
-
-  --page-w:        210mm;
-  --page-pad:      7mm;
-  --gap:           4mm;
-
-  --fs-base:       8pt;
-  --lh-base:       1.3;
+  --fs-base:   10.5pt;
+  --lh-base:   1.35;
 }
 
-/* ------------------ Reset ------------------ */
+/* ------------------ Base ------------------ */
 * { box-sizing: border-box; }
 
-html { background: var(--page-bg); }
+html, body { background: #ffffff; }
 
 body {
   margin: 0;
   padding: 0;
-  background: var(--page-bg);
   color: var(--ink);
-  font-family: "Segoe UI", Calibri, "Helvetica Neue", Arial, sans-serif;
+  font-family: Arial, Helvetica, sans-serif;
   font-size: var(--fs-base);
   line-height: var(--lh-base);
-  -webkit-font-smoothing: antialiased;
+  /* Ligatures (fi, fl) can extract as odd glyphs in some parsers. */
+  font-variant-ligatures: none;
+  font-feature-settings: "liga" 0, "clig" 0;
 }
 
 p { margin: 0; }
-ul { margin: 0; padding: 0; list-style: none; }
-a { color: inherit; text-decoration: underline; text-underline-offset: 1.5px; }
+a { color: inherit; text-decoration: none; }
 
-/* ------------------ Page ------------------ */
-.page {
-  width: var(--page-w);
-  height: 297mm;
+.resume {
+  max-width: 180mm;
   margin: 0 auto;
-  padding: var(--page-pad);
-  background: var(--page-bg);
-  overflow: hidden;
 }
 
-.layout {
-  display: grid;
-  grid-template-columns: 30.5% 1fr;
-  gap: var(--gap);
-  align-items: start;
-}
-
-.sidebar,
-.main {
-  display: flex;
-  flex-direction: column;
-  gap: var(--gap);
-}
-
-/* ------------------ Card ------------------ */
-.card {
-  background: var(--card-bg);
-  border-radius: var(--radius-card);
-  box-shadow: var(--shadow-card);
-  padding: 4mm 4.5mm 4mm;
-  break-inside: avoid;
-}
-
-.card--accent {
-  background: var(--accent);
-  color: var(--on-accent);
-  padding: 5mm 4.5mm;
-}
-
-.card__title {
-  margin: 0 0 2.5mm;
-  color: var(--accent-dark);
-  font-size: 11pt;
-  font-weight: 700;
-  line-height: 1.2;
-}
-
-/* ------------------ Header card ------------------ */
+/* ------------------ Header ------------------ */
 .name {
-  margin: 0;
-  font-size: 17pt;
-  font-weight: 800;
+  margin: 0 0 1mm;
+  font-size: 18pt;
+  font-weight: 700;
   line-height: 1.15;
-  text-align: center;
-  color: #171717;
-  letter-spacing: -0.2px;
 }
 
 .headline {
-  margin: 2mm 0 3mm;
-  text-align: center;
-  font-size: 9pt;
-  color: var(--on-accent-dim);
+  margin: 0 0 1.5mm;
+  font-size: 11.5pt;
+  font-weight: 700;
+  color: var(--ink-soft);
 }
 
 .contact {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  column-gap: 3mm;
-  row-gap: 1.2mm;
-  margin: 0;
-  font-size: 7.8pt;
+  font-size: 10pt;
+  color: var(--ink-soft);
 }
 
-.contact dt {
+/* ------------------ Sections ------------------ */
+.section { margin-top: 5mm; }
+
+.section__title {
+  margin: 0 0 2mm;
+  padding-bottom: 0.8mm;
+  border-bottom: 0.6pt solid var(--rule);
+  font-size: 12.5pt;
   font-weight: 700;
-  color: #171717;
-  white-space: nowrap;
+  text-transform: none;
+  break-after: avoid;
+  page-break-after: avoid;
 }
 
-.contact dd {
+/* ------------------ Lists ------------------ */
+ul {
   margin: 0;
-  color: var(--on-accent-dim);
-  overflow-wrap: anywhere;
+  padding-left: 5mm;
+  list-style: disc outside;
 }
 
-.contact a { text-decoration: none; }
-
-/* ------------------ Bullets ------------------ */
-.bullets li {
-  position: relative;
-  padding-left: 3.5mm;
-  margin-bottom: 1.2mm;
+li {
+  margin-bottom: 1mm;
   color: var(--ink-soft);
 }
 
-.bullets li:last-child { margin-bottom: 0; }
+li:last-child { margin-bottom: 0; }
 
-.bullets li::before {
-  content: "";
-  position: absolute;
-  left: 0.6mm;
-  top: 0.42em;
-  width: 1.25mm;
-  height: 1.25mm;
-  border-radius: 50%;
-  background: #8a8a8a;
+strong { color: var(--ink); font-weight: 700; }
+
+/* ------------------ Experience ------------------ */
+.job {
+  margin-bottom: 3.5mm;
+  break-inside: avoid;
+  page-break-inside: avoid;
 }
 
-.bullets strong { color: var(--ink); font-weight: 700; }
-
-/* ------------------ Education ------------------ */
-.edu p {
-  margin-bottom: 2.2mm;
-  color: var(--ink-soft);
-}
-
-.edu p:last-child { margin-bottom: 0; }
-.edu strong { color: var(--ink); font-weight: 700; }
-
-/* ------------------ Main content ------------------ */
-.profile {
-  color: var(--ink-soft);
-  text-align: left;
-}
-
-.profile strong { color: var(--ink); font-weight: 700; }
-
-.job { margin-bottom: 3mm; break-inside: avoid; }
 .job:last-child { margin-bottom: 0; }
 
 .job__role {
-  margin: 0 0 0.8mm;
-  font-size: 10pt;
+  margin: 0;
+  font-size: 11pt;
   font-weight: 700;
-  color: #171717;
+  break-after: avoid;
+  page-break-after: avoid;
 }
 
-.job__org {
-  margin: 0 0 1.6mm;
-  color: #545454;
-  font-size: 8.5pt;
+.job__meta {
+  margin: 0 0 1.2mm;
+  color: var(--ink-soft);
+  break-after: avoid;
+  page-break-after: avoid;
 }
+
+/* ------------------ Summary ------------------ */
+.summary { color: var(--ink-soft); }
 
 /* ------------------ Print ------------------ */
 @page {
   size: A4;
-  margin: 0;
+  margin: 15mm 16mm;
 }
 
-@media print {
-  html, body {
-    background: var(--page-bg);
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-
-  .page {
-    width: auto;
-    height: 297mm;
-    margin: 0;
-  }
-
-  a { text-decoration: none; }
-}
-
-/* ------------------ Screen preview ------------------ */
 @media screen {
-  body { padding: 8mm 0; }
-
-  .page {
-    background: var(--page-bg);
-    box-shadow: 0 2px 18px rgba(0, 0, 0, 0.16);
-  }
-}
-
-/* Narrow screens: single column so it stays readable in a browser */
-@media screen and (max-width: 820px) {
-  .page { width: 100%; padding: 5mm; }
-  .layout { grid-template-columns: 1fr; }
+  body { padding: 12mm 16px; }
 }
