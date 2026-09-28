@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:www.linkedin.com)",
+      "WebFetch(domain:es.linkedin.com)"
+    ]
+  }
+}
