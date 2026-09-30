@@ -28,7 +28,69 @@ cd cv && npm install
 
 Then open the project with Claude Code and ask something like *"build my profile from this CV"* (pasting your CV) or straight away *"tailor my CV to this posting: <link>"*. If `workspace/` does not exist, the skill creates it from the template and guides you.
 
-Building a PDF by hand:
+## Usage
+
+In Claude Code, pass the posting link to the skill:
+
+```
+/cv-tailor https://www.linkedin.com/jobs/view/1234567890
+```
+
+The agent then:
+
+1. **Reads the posting** (if the link cannot be fetched, e.g. behind a login, it asks you to paste the text).
+2. **Compares it with your profile** and classifies each requirement: already on record, a known gap, or unknown.
+3. **Asks you about anything unclear** in a single message (e.g. *"The posting asks for Kubernetes — do you use it?"*) and saves your answers to the profile.
+4. **Writes the tailored CV and cover letter**, shows you what changed and where each fact comes from, and builds the PDFs once you approve.
+5. **Logs the application** in `workspace/applications.md`.
+
+The result lands in its own subfolder, one per posting:
+
+```
+workspace/output/<company>-<role>/
+├── cv-<company>-<role>.md
+├── cv-<company>-<role>.pdf
+├── cover-letter-<company>-<role>.md
+└── cover-letter-<company>-<role>.pdf
+```
+
+Other things you can ask: *"update the Acme application to interview"*, *"add to my profile that I use Terraform"*, or `/profile-audit` to polish the profile for ATS without a specific posting.
+
+## Your workspace
+
+### Profile (`workspace/profile/`)
+
+The profile is the source of truth the CVs are built from. You don't have to fill it in upfront: it **grows over time** as you give the agent information, whether from your initial CV, the answers to its questions on each application, or anything you tell it directly. Every entry records where it came from and when.
+
+| File | What it stores |
+|---|---|
+| `skills.md` | Technical and management skills, with level and evidence |
+| `experience.md` | Achievement bank per role (more bullets than fit in a CV) |
+| `projects.md` | Projects, talks and community work |
+| `education.md` | Degrees, certifications and languages |
+| `stories.md` | Reusable anecdotes and arguments for cover letters |
+| `facts.md` | Practical data: contact, location, availability, answers to application forms |
+| `gaps.md` | What you confirmed you do **not** know or don't want to highlight, so it is not asked again |
+| `audit.md` | State of the ATS audit (`profile-audit`): pending, resolved and dismissed items |
+
+`workspace/cv-base.md` and `workspace/cover-letter-base.md` are the default selection (up to two pages) that each application starts from; the profile can hold much more than fits in a CV.
+
+### Application log (`workspace/applications.md`)
+
+A table with one row per application, most recent first: date, company, role, output folder, posting link, status and notes. `cv-tailor` adds the row when it builds the PDFs, and you update the status yourself or by asking the agent. Statuses:
+
+| Status | Meaning |
+|---|---|
+| `?` | PDFs generated, sending not confirmed yet |
+| `sent` | Application sent |
+| `interview` | In the interview process |
+| `offer` | Offer received |
+| `rejected` | Rejected |
+| `dropped` | Decided not to send it |
+
+The log also lets the agent warn you when you already applied to a company, and suggest updating the base CV when the same addition keeps showing up across applications.
+
+## Building PDFs by hand
 
 ```sh
 cd cv
