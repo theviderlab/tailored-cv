@@ -1,7 +1,7 @@
 # Gaps
 
-Cosas que confirmaste que **no** sabés, o que preferís no destacar. La skill no vuelve a preguntar por ellas y **nunca** las pone en un CV.
+Things you confirmed you do **not** know, or would rather not highlight. The skill does not ask about them again and **never** puts them in a CV.
 
-Formato: `- **<Skill o dato>** — <nota opcional, p. ej. "lo conoce de nombre" o "está aprendiendo"> · origen: <fuente> (<fecha>)`
+Format: `- **<Skill or fact>** — <optional note, e.g. "knows it by name" or "currently learning"> · source: <source> (<date>)`
 
-Si alguna pasa a ser verdad, moverla a `skills.md`.
+If one becomes true, move it to `skills.md`.

@@ -1,8 +1,8 @@
-# Registro de postulaciones
+# Application log
 
-Una fila por postulación, la más reciente arriba. La skill `cv-tailor` agrega la fila al generar los PDFs; el estado lo actualizás vos (o se lo pedís a la skill).
+One row per application, most recent first. The `cv-tailor` skill adds the row when it generates the PDFs; you update the status yourself (or ask the skill to).
 
-Estados: `enviada` · `entrevista` · `rechazada` · `oferta` · `descartada` (no se envió).
+Statuses: `sent` · `interview` · `rejected` · `offer` · `dropped` (not sent).
 
-| Fecha | Empresa | Rol | Carpeta | Link del aviso | Estado | Notas |
+| Date | Company | Role | Folder | Posting link | Status | Notes |
 |---|---|---|---|---|---|---|

@@ -1,79 +1,81 @@
 ---
 name: cv-tailor
-description: Adapta el CV y la cover letter base a un aviso de empleo específico (a partir de un link o texto pegado) y genera los PDFs. Usar cuando el usuario pida adaptar, tailorizar, personalizar o generar el CV / cover letter para una postulación, o pase un link de una oferta de trabajo. También para agregar skills, logros o datos al perfil profesional (workspace/profile/) o actualizar el estado de una postulación.
+description: Tailors the base CV and cover letter to a specific job posting (from a link or pasted text) and generates the PDFs. Use when the user asks to adapt, tailor, customize or generate the CV / cover letter for an application, or shares a link to a job offer. Also use to add skills, achievements or facts to the professional profile (workspace/profile/) or to update the status of an application.
 ---
 
 # CV Tailor
 
-Adapta el CV y la cover letter a una oferta concreta y produce los PDFs listos para enviar. Regla de oro: **nunca inventes datos**. Todo lo que quede en el CV debe salir del perfil (`workspace/profile/`) o de una respuesta explícita del usuario en la conversación.
+Tailors the CV and cover letter to a specific job offer and produces PDFs ready to send. Golden rule: **never invent data**. Everything in the CV must come from the profile (`workspace/profile/`) or from an explicit answer the user gave in the conversation.
 
-## Fuentes
+Talk to the user in their own language. Profile content goes in English; the CV and cover letter go in the language of the job posting.
 
-- **Perfil (fuente de verdad, crece con el uso):** `workspace/profile/`. Ver `workspace/profile/README.md` para qué va en cada archivo y sus reglas.
+## Sources
+
+- **Profile (source of truth, grows with use):** `workspace/profile/`. See `workspace/profile/README.md` for what goes in each file and its rules.
   - `skills.md`, `experience.md`, `projects.md`, `education.md`, `stories.md`, `facts.md`, `gaps.md`.
-- **CV base (selección por defecto, hasta dos páginas):** `workspace/cv-base.md`. Es el punto de partida de formato, orden y tono; el contenido se puede ampliar o reemplazar con lo que haya en el perfil.
-- **Cover letter base:** `workspace/cover-letter-base.md`. Punto de partida; los bloques alternativos están en `stories.md`.
-- **Registro de postulaciones:** `workspace/applications.md`.
-- **Buenas prácticas ATS:** `docs/ats-guidelines.md`. Aplícalas al redactar o reescribir bullets, perfil y skills (sobre todo B1–B7, K1, K2). La auditoría completa del perfil la hace la skill `profile-audit`.
+- **Base CV (default selection, up to two pages):** `workspace/cv-base.md`. It is the starting point for format, order and tone; its content can be extended or replaced with anything in the profile.
+- **Base cover letter:** `workspace/cover-letter-base.md`. Starting point; alternative blocks live in `stories.md`.
+- **Application log:** `workspace/applications.md`.
+- **ATS best practices:** `docs/ats-guidelines.md`. Apply them when writing or rewriting bullets, the summary and skills (especially B1–B7, K1, K2). The full profile audit is done by the `profile-audit` skill.
 
-Todo lo personal vive en `workspace/`, que está en el `.gitignore` del repo (el usuario puede versionarlo aparte, como repo privado propio). Nunca copies datos del usuario fuera de `workspace/`.
+Everything personal lives in `workspace/`, which is in the repo's `.gitignore` (the user may version it separately as their own private repo). Never copy user data outside `workspace/`.
 
-### Primera vez (si `workspace/` no existe)
+### First run (if `workspace/` does not exist)
 
-1. Copia `workspace.example/` a `workspace/`.
-2. Pídele al usuario su CV actual (pegado, o la ruta a un md/pdf) y con eso completa `workspace/cv-base.md` respetando el contrato del markdown de abajo, y los archivos de `workspace/profile/` (experiencia, skills, educación, datos de contacto en `facts.md`). Usa `origen: CV inicial (<AAAA-MM-DD>)`.
-3. Si tiene una cover letter, úsala como `workspace/cover-letter-base.md`; si no, arma una breve con lo del perfil y pídele que la apruebe.
-4. Genera el CV base (`npm run cv -- ../workspace/cv-base.md` desde `cv/`) para verificar que el build funciona, y sugiere correr `profile-audit`.
+1. Copy `workspace.example/` to `workspace/`.
+2. Ask the user for their current CV (pasted, or the path to an md/pdf) and use it to fill in `workspace/cv-base.md`, following the markdown contract below, and the files in `workspace/profile/` (experience, skills, education, contact details in `facts.md`). Use `source: initial CV (<YYYY-MM-DD>)`.
+3. If they have a cover letter, use it as `workspace/cover-letter-base.md`; otherwise draft a short one from the profile and ask them to approve it.
+4. Build the base CV (`npm run cv -- ../workspace/cv-base.md` from `cv/`) to check the build works, and suggest running `profile-audit`.
 
-El CV base y la cover letter base **no se editan** salvo que el usuario lo pida. El perfil y el registro **sí se editan** durante el flujo, siguiendo las reglas de abajo. Cada postulación genera sus archivos (md y pdf) en su propia subcarpeta `workspace/output/<empresa>-<rol>/`.
+The base CV and base cover letter **are not edited** unless the user asks. The profile and the log **are edited** during the flow, following the rules below. Each application gets its own files (md and pdf) in its own subfolder, `workspace/output/<company>-<role>/`.
 
-## Contrato del markdown (obligatorio para que el build funcione)
+## Markdown contract (required for the build to work)
 
-El script `cv/build-cv.js` mapea el markdown a una plantilla HTML de una columna optimizada para ATS. Los títulos de sección deben coincidir **exactamente** (incluidas mayúsculas y el `&`):
+`cv/build-cv.js` maps the markdown onto a single-column, ATS-optimized HTML template. Section headings must match **exactly** (including capitalization and the `&`):
 
 ```
-# <Nombre completo>
+# <Full name>
 **<Headline>**
 
-- **Location:** <país>
-- **Cell:** <teléfono>
+- **Location:** <country>
+- **Cell:** <phone>
 - **Email:** <email>
-- **LinkedIn:** [<texto>](<url>)
-- **GitHub:** [<texto>](<url>)
+- **LinkedIn:** [<text>](<url>)
+- **GitHub:** [<text>](<url>)
 
 ## Executive Profile
-<párrafo>
+<paragraph>
 
 ## Core Competencies & Technical Skills
-- **<categoría>:** <habilidades>
+- **<category>:** <skills>
 - ...
 
 ## Professional Experience
-### <Rol> — *<Organización>* (<Fechas>)
-- **<Etiqueta>:** <descripción>
+### <Role> — *<Organization>* (<Dates>)
+- **<Label>:** <description>
 - ...
 
-### <Rol 2> — *<Org 2>* (<Fechas 2>)
+### <Role 2> — *<Org 2>* (<Dates 2>)
 - ...
 
 ## Community Leadership & Tech Advocacy
-**<Título> | <Comunidad>** (<Frecuencia>)
+**<Title> | <Community>** (<Frequency>)
 - <bullet>
 - ...
 
 ## Education & Certifications
-- **<Título>** | <institución> (<año>) — <nota>
+- **<Degree>** | <institution> (<year>) — <note>
 - ...
 ```
 
-- La línea de contacto usa `- **Clave:** valor`. LinkedIn/GitHub llevan link en markdown; Email/Cell/Location van sin link.
-- Cada `###` de experiencia sigue exactamente `Rol — *Org* (Fechas)` (separado por em dash `—`). Fechas en formato `MMM YYYY – MMM YYYY` o `MMM YYYY – Present` cuando el perfil tiene los meses; si solo tiene el año, se usa el año.
-- Usa `**negrita**` para las etiquetas de cada bullet (p. ej. `**End-to-End AI Leadership:** ...`).
+- The contact lines use `- **Key:** value`. LinkedIn/GitHub take a markdown link; Email/Cell/Location have no link.
+- Each experience `###` follows exactly `Role — *Org* (Dates)` (separated by an em dash `—`). Dates use `MMM YYYY – MMM YYYY` or `MMM YYYY – Present` when the profile has the months; if it only has the year, use the year.
+- Use `**bold**` for each bullet's label (e.g. `**End-to-End AI Leadership:** ...`).
 
-### Idioma
+### Language
 
-- Los títulos `##` del markdown son **claves fijas en inglés** en cualquier idioma: no se traducen. Los títulos que se ven en el PDF (y el `lang` del HTML) salen de `cv/i18n.json` según el idioma del documento.
-- Si el documento no está en inglés, empieza con front matter indicando el idioma (vale igual para el CV y la carta):
+- The markdown `##` headings are **fixed English keys** in every language: they are never translated. The headings shown in the PDF (and the HTML `lang`) come from `cv/i18n.json` according to the document's language.
+- If the document is not in English, start it with front matter giving the language (same for the CV and the cover letter):
 
   ```
   ---
@@ -81,110 +83,110 @@ El script `cv/build-cv.js` mapea el markdown a una plantilla HTML de una columna
   ---
   ```
 
-  Sin front matter se asume `en`. `CV_LANG=<código>` en el entorno tiene prioridad sobre el front matter.
-- Idiomas disponibles: los que tenga `cv/i18n.json` (hoy `en`, `es`). Para sumar uno, agrega su bloque con **todas** las claves de `en`; el build falla si el idioma no existe y avisa si falta alguna clave.
-- En un CV que no está en inglés, las fechas usan los meses de ese idioma (p. ej. `Feb 2021 – Actualidad`, `Oct 2013 – Ene 2021`), con el mismo formato en todo el documento.
+  Without front matter, `en` is assumed. `CV_LANG=<code>` in the environment takes precedence over the front matter.
+- Available languages: whatever `cv/i18n.json` defines (currently `en`, `es`). To add one, add its block with **all** the keys from `en`; the build fails if the language does not exist and warns if a key is missing.
+- In a CV that is not in English, dates use that language's months (e.g. `Feb 2021 – Actualidad`, `Oct 2013 – Ene 2021`), with the same format throughout the document.
 
-## Contrato de la cover letter (obligatorio)
+## Cover letter contract (required)
 
-`cv/build-cover-letter.js` parsea la carta; el nombre, headline y contacto los toma **automáticamente del CV base** (no se duplican en la carta). Formato de `workspace/output/<empresa>-<rol>/cover-letter-<empresa>-<rol>.md`:
+`cv/build-cover-letter.js` parses the letter; the name, headline and contact details are taken **automatically from the base CV** (they are not duplicated in the letter). Format of `workspace/output/<company>-<role>/cover-letter-<company>-<role>.md`:
 
 ```
-<Saludo>
+<Salutation>
 
-<Párrafo 1>
+<Paragraph 1>
 
-<Párrafo 2>
+<Paragraph 2>
 
 ...
 
 Best regards,
-<Tu nombre>
+<Your name>
 ```
 
-- Párrafos separados por línea en blanco.
-- El **primer** párrafo es el saludo (p. ej. `Dear Hiring Team,`).
-- El **último** bloque es el cierre: su primera línea es la despedida (`Best regards,`) y las restantes son la firma (nombre).
-- Todo lo del medio son párrafos del cuerpo.
+- Paragraphs are separated by a blank line.
+- The **first** paragraph is the salutation (e.g. `Dear Hiring Team,`).
+- The **last** block is the closing: its first line is the sign-off (`Best regards,`) and the remaining lines are the signature (name).
+- Everything in between is body paragraphs.
 
-## Flujo
+## Flow
 
-1. **Lee las fuentes:** todo `workspace/profile/`, el CV base, la cover letter base y `workspace/applications.md` (para detectar si ya se postuló a esa empresa).
+1. **Read the sources:** all of `workspace/profile/`, the base CV, the base cover letter and `workspace/applications.md` (to detect whether the user already applied to that company).
 
-2. **Obtén el aviso.** Si el usuario da un link, usa la herramienta de fetch web (`WebFetch` en Claude Code, `webfetch` en OpenCode). Si el fetch falla (LinkedIn bloquea bots, login, JS), pídele que pegue el texto del aviso.
+2. **Get the job posting.** If the user gives a link, use the web fetch tool (`WebFetch` in Claude Code, `webfetch` in OpenCode). If the fetch fails (LinkedIn blocks bots, login walls, JS-only pages), ask them to paste the posting text.
 
-3. **Cruza el aviso contra el perfil.** Extrae los requisitos del aviso (skills, herramientas, experiencia, idiomas, condiciones como ciudad o modalidad) y clasifícalos:
-   - **En el perfil:** se pueden usar directamente.
-   - **En `gaps.md`:** no se usan y no se pregunta. Si es un requisito central, menciónalo al usuario como brecha.
-   - **En el perfil con `nivel: ?` o `evidencia: ?`**, y el requisito es importante en el aviso: pregunta el detalle (una línea basta).
-   - **No aparece en ningún lado:** pregunta.
+3. **Match the posting against the profile.** Extract the posting's requirements (skills, tools, experience, languages, conditions such as city or work mode) and classify them:
+   - **In the profile:** can be used directly.
+   - **In `gaps.md`:** not used and not asked about. If it is a core requirement, point it out to the user as a gap.
+   - **In the profile with `level: ?` or `evidence: ?`**, and the requirement matters in the posting: ask for the detail (one line is enough).
+   - **Not recorded anywhere:** ask.
 
-   Haz **todas las preguntas juntas en un solo mensaje**, cortas y concretas. Por ejemplo:
-   > El aviso pide estas cosas que no tengo registradas:
-   > 1. SQL — ¿lo usás? Si sí, ¿dónde o cuánto? (opcional)
-   > 2. Kubernetes — ¿lo usás?
-   > 3. Modalidad híbrida en Madrid — ¿te sirve?
+   Ask **all the questions together in a single message**, short and specific. For example:
+   > The posting asks for these things I don't have on record:
+   > 1. SQL — do you use it? If so, where or how much? (optional)
+   > 2. Kubernetes — do you use it?
+   > 3. Hybrid work in Madrid — does that work for you?
 
-   Si la herramienta de preguntas estructuradas (`AskUserQuestion`) está disponible y son pocas preguntas de sí/no, puedes usarla.
+   If the structured question tool (`AskUserQuestion`) is available and there are only a few yes/no questions, you may use it.
 
-4. **Actualiza el perfil con las respuestas** (antes de escribir el CV):
-   - **Sí** → agrega o completa la entrada en el archivo que corresponda (`skills.md`, `experience.md`, `facts.md`…) con el formato de ese archivo y `origen: postulación <empresa>-<rol> (<AAAA-MM-DD>)`. Un "sí" sin detalle es suficiente: se guarda con `nivel: ?` / `evidencia: ?`.
-   - **No** → agrégalo a `gaps.md` con el mismo formato de origen.
-   - Si el usuario da un logro, métrica o anécdota nueva, guárdala también (`experience.md` o `stories.md`), aunque no se use en esta postulación.
-   - Si una respuesta contradice algo del perfil, actualiza la entrada existente (no dupliques) y avísale.
-   - Muestra al usuario un resumen de una línea por cambio en el perfil.
+4. **Update the profile with the answers** (before writing the CV):
+   - **Yes** → add or complete the entry in the matching file (`skills.md`, `experience.md`, `facts.md`…) using that file's format and `source: application <company>-<role> (<YYYY-MM-DD>)`. A "yes" without detail is enough: it is saved with `level: ?` / `evidence: ?`.
+   - **No** → add it to `gaps.md` with the same source format.
+   - If the user shares a new achievement, metric or anecdote, save it too (`experience.md` or `stories.md`), even if it is not used in this application.
+   - If an answer contradicts something in the profile, update the existing entry (do not duplicate it) and tell the user.
+   - Show the user a one-line summary per profile change.
 
-5. **Propón adaptaciones** del CV y la cover letter para ese aviso:
-   - Parte del CV base y reemplaza o suma contenido del perfil que encaje mejor con la oferta (skills, bullets de `experience.md`, bloques de `stories.md`).
-   - Reordena o reescribe bullets para priorizar lo que pide la oferta.
-   - Ajusta el perfil/headline al rol y la empresa.
-   - Usa SOLO información del perfil o de la conversación. Si falta algo, pregunta.
-   - Redacta siguiendo `docs/ats-guidelines.md`: sigla y forma completa en la primera aparición, las keywords del aviso con la misma forma que usa el aviso, nada de afirmaciones absolutas, y métricas solo si están en el perfil.
-   - Recuerda el límite de dos páginas del CV: sumar algo suele implicar quitar otra cosa.
+5. **Propose adaptations** of the CV and cover letter for that posting:
+   - Start from the base CV and replace or add profile content that fits the offer better (skills, bullets from `experience.md`, blocks from `stories.md`).
+   - Reorder or rewrite bullets to prioritize what the offer asks for.
+   - Adjust the summary/headline to the role and company.
+   - Use ONLY information from the profile or the conversation. If something is missing, ask.
+   - Write following `docs/ats-guidelines.md`: acronym and full form on first use, the posting's keywords in the same form the posting uses, no absolute claims, and metrics only if they are in the profile.
+   - Keep the CV's two-page limit in mind: adding something usually means removing something else.
 
-6. **Escribe los archivos nuevos** en una subcarpeta propia de la postulación, `workspace/output/<empresa>-<rol>/` (no toques los base; crea la carpeta si no existe). Nunca escribas archivos sueltos en la raíz de `workspace/output/`:
-   - `workspace/output/<empresa>-<rol>/cv-<empresa>-<rol>.md`
-   - `workspace/output/<empresa>-<rol>/cover-letter-<empresa>-<rol>.md`
-   - (empresa y rol en slug: minúsculas, sin espacios ni acentos, separados por `-`. Los nombres de archivo mantienen el slug para que los PDFs sigan siendo identificables al enviarlos.)
-   - Si la carpeta ya existe (misma empresa y rol), pregúntale al usuario si sobreescribir o usar un sufijo (p. ej. `-2`).
+6. **Write the new files** in the application's own subfolder, `workspace/output/<company>-<role>/` (do not touch the base files; create the folder if it does not exist). Never write loose files at the root of `workspace/output/`:
+   - `workspace/output/<company>-<role>/cv-<company>-<role>.md`
+   - `workspace/output/<company>-<role>/cover-letter-<company>-<role>.md`
+   - (company and role as slugs: lowercase, no spaces or accents, separated by `-`. File names keep the slug so the PDFs remain identifiable when sent.)
+   - If the folder already exists (same company and role), ask the user whether to overwrite or use a suffix (e.g. `-2`).
 
-7. **Verifica antes de generar.** Compara el archivo nuevo contra el CV base y produce un reporte breve:
-   - Lista cada cambio sustantivo (frase, dato, número, link, nombre).
-   - Para cada dato nuevo, indica su origen (archivo del perfil o respuesta del usuario en esta conversación).
-   - Marca explícitamente cualquier cosa que no sea rastreable al perfil o a la conversación. Si existe algo así, corrígelo o pregunta.
-   - Chequeo ATS rápido: siglas clave con su forma completa, keywords centrales del aviso presentes en skills y en al menos un bullet, formato de fechas consistente.
+7. **Verify before building.** Compare the new file against the base CV and produce a short report:
+   - List each substantive change (phrase, fact, number, link, name).
+   - For each new fact, state its source (profile file or the user's answer in this conversation).
+   - Explicitly flag anything that cannot be traced to the profile or the conversation. If there is anything like that, fix it or ask.
+   - Quick ATS check: key acronyms with their full form, the posting's core keywords present in skills and in at least one bullet, consistent date format.
 
-8. **Genera los PDFs tras la aprobación del usuario.** Cuando el usuario confirme, ejecuta desde `cv/`:
-
-   ```
-   npm run cv -- ../workspace/output/<empresa>-<rol>/cv-<empresa>-<rol>.md
-   npm run cover -- ../workspace/output/<empresa>-<rol>/cover-letter-<empresa>-<rol>.md
-   ```
-
-   Si la postulación no está en inglés, pasa el CV adaptado como segundo argumento de `npm run cover` para que el encabezado de la carta use su headline (en el idioma de la carta) en lugar de la del CV base:
+8. **Build the PDFs once the user approves.** When the user confirms, run from `cv/`:
 
    ```
-   npm run cover -- ../workspace/output/<empresa>-<rol>/cover-letter-<empresa>-<rol>.md ../workspace/output/<empresa>-<rol>/cv-<empresa>-<rol>.md
+   npm run cv -- ../workspace/output/<company>-<role>/cv-<company>-<role>.md
+   npm run cover -- ../workspace/output/<company>-<role>/cover-letter-<company>-<role>.md
    ```
 
-   Cada PDF se crea junto a su `.md`, dentro de la subcarpeta de la postulación. Si el CV pasa de 2 páginas o la carta reporta overflow, recorta ese texto y regenera. Los bloques de experiencia no se parten entre páginas: si el primer rol no entra en la página 1, salta entero a la 2 y el CV puede pasar a 3 páginas aunque sobre espacio. En ese caso, acorta el perfil, las skills o los bullets del primer rol.
+   If the application is not in English, pass the tailored CV as the second argument to `npm run cover` so the letter's header uses its headline (in the letter's language) instead of the base CV's:
 
-9. **Registra la postulación** en `workspace/applications.md`: agrega una fila arriba con fecha, empresa, rol, carpeta, link del aviso (si lo hay), estado `enviada` (o `?` si el usuario no confirmó el envío) y notas breves (p. ej. idioma).
+   ```
+   npm run cover -- ../workspace/output/<company>-<role>/cover-letter-<company>-<role>.md ../workspace/output/<company>-<role>/cv-<company>-<role>.md
+   ```
 
-10. **Sugiere mejoras al CV base (opcional).** Si en el registro ves que algo se agregó en 3 o más postulaciones recientes (p. ej. SQL o LangChain), o que un bullet de la base se quita siempre, sugiérele al usuario en una línea actualizar el CV base. No lo edites sin su aprobación.
+   Each PDF is created next to its `.md`, inside the application's subfolder. If the CV goes over 2 pages or the letter reports overflow, trim that text and rebuild. Experience blocks are not split across pages: if the first role does not fit on page 1, it jumps whole to page 2 and the CV can reach 3 pages even with space left over. In that case, shorten the summary, the skills or the first role's bullets.
 
-## Otros usos
+9. **Log the application** in `workspace/applications.md`: add a row at the top with date, company, role, folder, posting link (if any), status `sent` (or `?` if the user has not confirmed sending it) and short notes (e.g. language).
 
-- **"Agregá X a mi perfil" / "ahora sé X":** actualiza el archivo del perfil que corresponda con `origen: conversación (<fecha>)`, sin armar un CV.
-- **"Actualizá el estado de la postulación a X":** edita la fila en `workspace/applications.md`.
-- **"Revisá / auditá / mejorá mi perfil para ATS"** (sin aviso): no es de esta skill, usa `profile-audit`.
-- Si en el paso 3 aparecen datos flojos que no pide el aviso (fechas sin mes, bullets sin métricas), no los preguntes ahora: sugiere en una línea correr `profile-audit`.
+10. **Suggest base CV improvements (optional).** If the log shows something was added in 3 or more recent applications (e.g. SQL or LangChain), or that a base bullet is always removed, suggest in one line that the user update the base CV. Do not edit it without their approval.
 
-## Notas del build
+## Other uses
 
-- Requiere Node (dep `markdown-it`) y Chrome/Edge instalados. `npm install` en `cv/` la primera vez.
-- `npm run cv` genera **un PDF** optimizado para ATS, `<nombre>.pdf`, junto al markdown (una columna; plantilla `cv/design/template.html` + `style.css`). Usa títulos estándar para ATS según el idioma del documento (definidos en `cv/i18n.json`; en inglés: Summary, Skills, Professional Experience, Education & Certifications, Volunteer Experience) sin cambiar el contrato del markdown. Ver "Idioma".
-- **El CV puede ocupar hasta 2 páginas.** Si pasa de 2, el build **termina con código 1**: acorta el markdown (recorta bullets o reescribe el perfil) hasta que salga limpio, antes de entregar el PDF.
-- El build de la cover letter (`npm run cover`) usa como base de identidad `workspace/cv-base.md`; se puede sobreescribir con `CV_BASE=...` o un segundo argumento.
-- Si el usuario quiere inspeccionar el HTML intermedio: `CV_KEEP_HTML=1 npm run cv -- <md>` conserva `cv/design/.tmp_cv.html` (o `.tmp_cover.html` para la carta).
-- Los estilos viven en `cv/design/style.css` (CV) y `cv/design/style-cover-letter.css`; no edites el CSS salvo que el usuario lo pida.
+- **"Add X to my profile" / "I now know X":** update the matching profile file with `source: conversation (<date>)`, without building a CV.
+- **"Update the application status to X":** edit the row in `workspace/applications.md`.
+- **"Review / audit / improve my profile for ATS"** (no posting): not this skill's job, use `profile-audit`.
+- If step 3 surfaces weak data the posting does not ask about (dates without months, bullets without metrics), do not ask about it now: suggest running `profile-audit` in one line.
+
+## Build notes
+
+- Requires Node (`markdown-it` dependency) and Chrome/Edge installed. Run `npm install` in `cv/` the first time.
+- `npm run cv` generates **one ATS-optimized PDF**, `<name>.pdf`, next to the markdown (single column; template `cv/design/template.html` + `style.css`). It uses standard ATS headings in the document's language (defined in `cv/i18n.json`; in English: Summary, Skills, Professional Experience, Education & Certifications, Volunteer Experience) without changing the markdown contract. See "Language".
+- **The CV can be up to 2 pages.** If it goes over 2, the build **exits with code 1**: shorten the markdown (trim bullets or rewrite the summary) until it builds cleanly, before delivering the PDF.
+- The cover letter build (`npm run cover`) takes its identity from `workspace/cv-base.md`; this can be overridden with `CV_BASE=...` or a second argument.
+- If the user wants to inspect the intermediate HTML: `CV_KEEP_HTML=1 npm run cv -- <md>` keeps `cv/design/.tmp_cv.html` (or `.tmp_cover.html` for the letter).
+- Styles live in `cv/design/style.css` (CV) and `cv/design/style-cover-letter.css`; do not edit the CSS unless the user asks.

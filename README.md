@@ -1,23 +1,23 @@
 # tailored-cv
 
-Adapta tu CV y tu cover letter a cada aviso de empleo con un agente de IA (Claude Code u OpenCode), y genera PDFs listos para enviar, optimizados para ATS.
+Tailor your CV and cover letter to each job posting with an AI agent (Claude Code or OpenCode), and generate ATS-optimized PDFs ready to send.
 
-La idea central es un **perfil profesional que crece con el uso**: cada vez que un aviso pide algo que no está registrado, el agente te pregunta, guarda la respuesta y la reutiliza en las próximas postulaciones. Nunca inventa datos: todo lo que sale en el CV viene de tu perfil o de algo que confirmaste.
+The core idea is a **professional profile that grows with use**: whenever a posting asks for something that is not on record, the agent asks you, saves the answer and reuses it in future applications. It never invents data: everything in the CV comes from your profile or from something you confirmed.
 
-## Cómo funciona
+## How it works
 
-| Pieza | Qué hace |
+| Piece | What it does |
 |---|---|
-| `.claude/skills/cv-tailor/` | Lee el aviso (link o texto), lo cruza con tu perfil, te pregunta lo que falta, escribe el CV y la carta adaptados y genera los PDFs. |
-| `.claude/skills/profile-audit/` | Revisa tu perfil contra buenas prácticas ATS y te hace las preguntas para mejorarlo. |
-| `docs/ats-guidelines.md` | Las reglas ATS que aplican las dos skills. |
-| `cv/` | Build markdown → PDF con Node y Chrome/Edge headless. |
-| `workspace.example/` | Plantilla vacía de tu espacio personal. |
-| `workspace/` | **Tu** espacio: perfil, CV base, postulaciones y PDFs generados. Está en el `.gitignore`. |
+| `.claude/skills/cv-tailor/` | Reads the posting (link or text), matches it against your profile, asks you what is missing, writes the tailored CV and cover letter and generates the PDFs. |
+| `.claude/skills/profile-audit/` | Reviews your profile against ATS best practices and asks you the questions needed to improve it. |
+| `docs/ats-guidelines.md` | The ATS rules both skills apply. |
+| `cv/` | Markdown → PDF build with Node and headless Chrome/Edge. |
+| `workspace.example/` | Empty template for your personal workspace. |
+| `workspace/` | **Your** workspace: profile, base CV, applications and generated PDFs. It is in `.gitignore`. |
 
-## Primeros pasos
+## Getting started
 
-Requisitos: Node 18+ y Chrome o Edge instalados.
+Requirements: Node 18+ and Chrome or Edge installed.
 
 ```sh
 git clone https://github.com/theviderlab/tailored-cv.git
@@ -26,38 +26,38 @@ cp -r workspace.example workspace
 cd cv && npm install
 ```
 
-Después abrí el proyecto con Claude Code y pedile algo como *"armá mi perfil a partir de este CV"* (pegando tu CV) o directamente *"adaptá mi CV a este aviso: <link>"*. Si `workspace/` no existe, la skill la crea desde la plantilla y te guía.
+Then open the project with Claude Code and ask something like *"build my profile from this CV"* (pasting your CV) or straight away *"tailor my CV to this posting: <link>"*. If `workspace/` does not exist, the skill creates it from the template and guides you.
 
-Generar un PDF a mano:
+Building a PDF by hand:
 
 ```sh
 cd cv
-npm run cv -- ../workspace/cv-base.md          # CV optimizado para ATS
+npm run cv -- ../workspace/cv-base.md          # ATS-optimized CV
 npm run cover -- ../workspace/cover-letter-base.md
 ```
 
-## Backup de tus datos (opcional, recomendado)
+## Backing up your data (optional, recommended)
 
-`workspace/` queda fuera de este repo, así que podés versionarlo como un repo **privado** independiente:
+`workspace/` stays out of this repo, so you can version it as an independent **private** repo:
 
 ```sh
 cd workspace
 git init
 git add .
 git commit -m "Initial profile"
-gh repo create <tu-usuario>/tailored-cv-workspace --private --source . --push
+gh repo create <your-user>/tailored-cv-workspace --private --source . --push
 ```
 
-Desde ahí, los cambios a la herramienta se commitean en la raíz y los cambios a tus datos, dentro de `workspace/`.
+From then on, changes to the tool are committed at the root and changes to your data inside `workspace/`.
 
-### Red de seguridad contra filtraciones
+### Safety net against leaks
 
-El hook `.githooks/pre-commit` bloquea cualquier commit al repo de la herramienta que incluya archivos de `workspace/` o texto que coincida con los patrones de `workspace/.private-patterns` (tu nombre, email, teléfono…; uno por línea). Activalo una vez por clon:
+The `.githooks/pre-commit` hook blocks any commit to the tool's repo that includes files from `workspace/` or text matching the patterns in `workspace/.private-patterns` (your name, email, phone…; one per line). Enable it once per clone:
 
 ```sh
 git config core.hooksPath .githooks
 ```
 
-## Idioma
+## Language
 
-Las skills y las notas internas están en español; el contenido del CV va en el idioma del aviso (normalmente inglés). Para un CV o una carta en otro idioma, empezá el markdown con front matter (`---` / `lang: es` / `---`): los títulos del PDF salen de `cv/i18n.json`, donde se pueden sumar idiomas.
+The skills talk to you in your language; the profile is kept in English and the CV content follows the language of the posting. For a CV or cover letter in another language, start the markdown with front matter (`---` / `lang: es` / `---`): the PDF headings come from `cv/i18n.json`, where more languages can be added.

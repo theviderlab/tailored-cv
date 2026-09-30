@@ -1,8 +1,8 @@
-# Facts (datos prácticos)
+# Facts (practical data)
 
-Datos que piden los portales y formularios, o que condicionan si una oferta encaja. Completar a medida que surjan.
+Data that job portals and forms ask for, or that decides whether an offer fits. Fill in as it comes up.
 
-## Contacto
+## Contact
 
 - **Name:** ?
 - **Location:** ?
@@ -11,15 +11,15 @@ Datos que piden los portales y formularios, o que condicionan si una oferta enca
 - **LinkedIn:** ?
 - **GitHub:** ?
 
-## Condiciones
+## Conditions
 
-- **Ciudad:** ?
-- **Modalidad aceptada (remoto / híbrido / presencial):** ?
-- **Disponibilidad para viajar / reubicarse:** ?
-- **Permiso de trabajo:** ?
-- **Preaviso / fecha de incorporación:** ?
-- **Pretensión salarial:** ?
+- **City:** ?
+- **Accepted work mode (remote / hybrid / on-site):** ?
+- **Willing to travel / relocate:** ?
+- **Work permit:** ?
+- **Notice period / start date:** ?
+- **Salary expectations:** ?
 
-## Respuestas de formularios
+## Form answers
 
-Preguntas frecuentes de los portales y la respuesta aprobada. Formato: `### <pregunta>` + respuesta + `origen:`.
+Frequent questions from job portals and the approved answer. Format: `### <question>` + answer + `source:`.

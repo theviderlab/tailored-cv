@@ -1,6 +1,6 @@
 # Education, Certifications & Languages
 
-Formato: `- **<Título completo>** | <Institución>, <Ciudad, País> (<MMM YYYY – MMM YYYY>) — <nota opcional>` y, debajo, `  - origen: <fuente> (<fecha>)`.
+Format: `- **<Full degree name>** | <Institution>, <City, Country> (<MMM YYYY – MMM YYYY>) — <optional note>` and, below it, `  - source: <source> (<date>)`.
 
 ## Degrees
 

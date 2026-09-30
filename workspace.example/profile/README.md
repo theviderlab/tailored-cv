@@ -1,27 +1,27 @@
-# Perfil profesional (fuente de verdad)
+# Professional profile (source of truth)
 
-Esta carpeta guarda **todo** lo que sabés e hiciste. Crece con el uso: cada vez que la skill `cv-tailor` pregunta por algo que no estaba registrado y la respuesta es confirmada, se agrega aquí.
+This folder holds **everything** you know and have done. It grows with use: whenever the `cv-tailor` skill asks about something that was not on record and the answer is confirmed, it is added here.
 
-El CV base (`workspace/cv-base.md`) es solo **una selección de hasta dos páginas** de este perfil. El perfil puede tener mucho más contenido del que entra en un CV.
+The base CV (`workspace/cv-base.md`) is just **a selection of up to two pages** from this profile. The profile can hold much more than fits in a CV.
 
-| Archivo | Qué contiene |
+| File | What it contains |
 |---|---|
-| `skills.md` | Habilidades técnicas y de gestión, con nivel y evidencia |
-| `experience.md` | Banco de logros por rol (más bullets de los que entran en un CV) |
-| `projects.md` | Proyectos, charlas, comunidad |
-| `education.md` | Títulos, certificaciones, idiomas |
-| `stories.md` | Anécdotas y argumentos reutilizables para cover letters |
-| `facts.md` | Datos prácticos: contacto, ubicación, disponibilidad, respuestas de formularios |
-| `gaps.md` | Lo que confirmaste que **no** sabés o no querés destacar (para no volver a preguntar) |
-| `audit.md` | Estado de la auditoría ATS (skill `profile-audit`): pendiente, resuelto y descartado |
+| `skills.md` | Technical and management skills, with level and evidence |
+| `experience.md` | Achievement bank per role (more bullets than fit in a CV) |
+| `projects.md` | Projects, talks, community |
+| `education.md` | Degrees, certifications, languages |
+| `stories.md` | Reusable anecdotes and arguments for cover letters |
+| `facts.md` | Practical data: contact, location, availability, form answers |
+| `gaps.md` | What you confirmed you do **not** know or do not want to highlight (so it is not asked again) |
+| `audit.md` | ATS audit state (`profile-audit` skill): pending, resolved and dismissed |
 
-Las buenas prácticas ATS que se aplican a este perfil están en `docs/ats-guidelines.md`.
+The ATS best practices applied to this profile are in `docs/ats-guidelines.md`.
 
-## Reglas
+## Rules
 
-- **Nada entra sin confirmación.** Cada dato nuevo viene de una respuesta explícita del usuario.
-- **Cada entrada nueva lleva su origen**: `origen: <postulación o conversación> (<AAAA-MM-DD>)`.
-- El contenido va en inglés (idioma del CV); las notas internas pueden ir en español.
-- Si un dato cambia (p. ej. sube el nivel de una skill), se actualiza la entrada existente, no se duplica.
-- Si algo de `gaps.md` pasa a ser verdad, se mueve a `skills.md`.
-- Las fechas van en formato `MMM YYYY – MMM YYYY` (o `– Present`). Si solo se conoce el año, queda el año hasta que la auditoría lo complete.
+- **Nothing goes in without confirmation.** Every new fact comes from an explicit answer by the user.
+- **Every new entry records its source**: `source: <application or conversation> (<YYYY-MM-DD>)`.
+- Content is in English (the CV's language).
+- If a fact changes (e.g. a skill's level goes up), the existing entry is updated, not duplicated.
+- If something in `gaps.md` becomes true, it moves to `skills.md`.
+- Dates use the `MMM YYYY – MMM YYYY` format (or `– Present`). If only the year is known, the year stays until the audit completes it.

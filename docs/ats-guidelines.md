@@ -1,52 +1,52 @@
-# ATS Guidelines (buenas prácticas)
+# ATS Guidelines (best practices)
 
-Reglas que usan las skills `profile-audit` (para detectar mejoras en `workspace/profile/`) y `cv-tailor` (al redactar CVs). Cada regla tiene un ID para citarla en los hallazgos de la auditoría.
+Rules used by the `profile-audit` skill (to find improvements in `workspace/profile/`) and the `cv-tailor` skill (when writing CVs). Each rule has an ID so audit findings can cite it.
 
-Prioridad:
-- **P1 — Parseo:** si falla, el ATS extrae mal el dato (fechas, empleador, título) o calcula mal los años de experiencia.
-- **P2 — Match e impacto:** afecta el puntaje por keywords o cómo lo lee el reclutador después del filtro.
-- **P3 — Pulido:** estilo, consistencia, redundancias.
+Priority:
+- **P1 — Parsing:** if it fails, the ATS extracts the data wrong (dates, employer, title) or miscalculates years of experience.
+- **P2 — Match and impact:** affects the keyword score or how the recruiter reads it after the filter.
+- **P3 — Polish:** style, consistency, redundancy.
 
-## 1. Estructura y parseo
+## 1. Structure and parsing
 
-- **S1 (P1) — Fechas mes/año.** Formato `MMM YYYY – MMM YYYY` o `MMM YYYY – Present` (meses en inglés abreviados: Jan, Feb, Mar, Apr, May, Jun, Jul, Aug, Sep, Oct, Nov, Dec). Con solo el año, muchos ATS asumen enero o calculan mal la antigüedad. El mismo formato en todo el perfil.
-- **S2 (P1) — Un empleador por entrada.** Cada entrada de experiencia es un empleador con sus fechas. Si hubo varios empleadores, van en entradas separadas. Si fue una consultora o un trabajo independiente con varios clientes, el empleador es la consultora y los clientes se nombran en los bullets o en una línea `Clients: ...`.
-- **S3 (P1) — Nombre del empleador concreto.** Nada de genéricos como "Client Projects". Para independientes: nombre comercial + `(Self-employed)` o `Independent Consultant`.
-- **S4 (P1) — Título de puesto reconocible.** El título real, en la forma estándar del mercado (el que alguien buscaría). Si el título interno es raro, se puede sumar el equivalente estándar, sin inflarlo.
-- **S5 (P2) — Ubicación por rol.** `City, Country` o `Remote (Country)`. Los ATS la usan en los filtros. (El template actual no la muestra por rol; se guarda igual en el perfil para portales y formularios.)
-- **S6 (P1) — Secciones con títulos estándar.** Summary, Skills, Professional Experience, Education, Certifications, Languages, Volunteer Experience. (La plantilla ATS ya los mapea.)
-- **S7 (P1) — Contacto completo en el cuerpo.** Nombre, `City, Country`, teléfono con código de país, email y URL de LinkedIn. Sin dirección completa. Nunca en encabezado ni pie de página. (`facts.md`)
-- **S8 (P1) — Educación completa.** Nombre completo del título (sin abreviar), institución con nombre completo (acrónimo entre paréntesis), ubicación y fecha de egreso (mes/año ideal, año aceptable). Los títulos en curso llevan `Expected MMM YYYY`.
-- **S9 (P2) — Certificaciones.** Nombre oficial, emisor, fecha de obtención (mes/año). Si está en curso: `In progress — expected MMM YYYY`. ID o URL de credencial si existe.
-- **S10 (P2) — Idiomas con nivel estándar.** CEFR (A1–C2) o Native. Certificado y año si hay.
-- **S11 (P3) — Brechas de más de 6 meses.** No hace falta explicarlas en el CV, pero conviene saberlas para no dejar fechas que parezcan un error.
+- **S1 (P1) — Month/year dates.** Format `MMM YYYY – MMM YYYY` or `MMM YYYY – Present` (abbreviated English months: Jan, Feb, Mar, Apr, May, Jun, Jul, Aug, Sep, Oct, Nov, Dec). With only the year, many ATSs assume January or miscalculate tenure. Use the same format across the whole profile.
+- **S2 (P1) — One employer per entry.** Each experience entry is one employer with its dates. Multiple employers go in separate entries. For a consultancy or freelance work with several clients, the employer is the consultancy and the clients are named in the bullets or in a `Clients: ...` line.
+- **S3 (P1) — Concrete employer name.** No generic names like "Client Projects". For freelancers: trade name + `(Self-employed)` or `Independent Consultant`.
+- **S4 (P1) — Recognizable job title.** The real title, in its standard market form (the one someone would search for). If the internal title is unusual, the standard equivalent can be added, without inflating it.
+- **S5 (P2) — Location per role.** `City, Country` or `Remote (Country)`. ATSs use it in filters. (The current template does not show it per role; it is still kept in the profile for job portals and forms.)
+- **S6 (P1) — Sections with standard headings.** Summary, Skills, Professional Experience, Education, Certifications, Languages, Volunteer Experience. (The ATS template already maps them.)
+- **S7 (P1) — Full contact details in the body.** Name, `City, Country`, phone with country code, email and LinkedIn URL. No full street address. Never in a header or footer. (`facts.md`)
+- **S8 (P1) — Complete education.** Full degree name (not abbreviated), full institution name (acronym in parentheses), location and graduation date (month/year ideally, year acceptable). Degrees in progress get `Expected MMM YYYY`.
+- **S9 (P2) — Certifications.** Official name, issuer, date obtained (month/year). If in progress: `In progress — expected MMM YYYY`. Credential ID or URL if there is one.
+- **S10 (P2) — Languages with a standard level.** CEFR (A1–C2) or Native. Certificate and year if any.
+- **S11 (P3) — Gaps longer than 6 months.** They do not need explaining in the CV, but it is worth knowing about them so dates do not look like a mistake.
 
-## 2. Keywords y skills
+## 2. Keywords and skills
 
-- **K1 (P2) — Sigla y forma completa.** La primera aparición lleva las dos: `Retrieval-Augmented Generation (RAG)`, `Natural Language Processing (NLP)`, `Model Context Protocol (MCP)`. El ATS puede buscar cualquiera de las dos.
-- **K2 (P2) — Nombres canónicos.** Las herramientas se escriben como las escribe el fabricante o el mercado: `PyTorch`, `scikit-learn`, `Amazon Web Services (AWS)`, `PostgreSQL`. Nada de categorías vagas cuando se puede nombrar la herramienta (p. ej. "Cloud Infrastructure" → qué proveedor y qué servicios).
-- **K3 (P2) — Skills con evidencia en contexto.** Toda skill importante del listado debería aparecer también en al menos un bullet de experiencia o proyecto. Los ATS modernos y los reclutadores ponderan el uso en contexto.
-- **K4 (P2) — Nivel y años.** Muchos formularios piden años de experiencia por skill. El perfil guarda nivel y, si se puede, años o período (`2022–present`). En el CV no van barras ni puntajes.
-- **K5 (P3) — Hard skills en el listado, soft skills en los bullets.** "Leadership" o "communication" se demuestran con logros, no se listan sueltos.
+- **K1 (P2) — Acronym and full form.** The first occurrence has both: `Retrieval-Augmented Generation (RAG)`, `Natural Language Processing (NLP)`, `Model Context Protocol (MCP)`. The ATS may search for either.
+- **K2 (P2) — Canonical names.** Tools are written the way the vendor or the market writes them: `PyTorch`, `scikit-learn`, `Amazon Web Services (AWS)`, `PostgreSQL`. No vague categories when the tool can be named (e.g. "Cloud Infrastructure" → which provider and which services).
+- **K3 (P2) — Skills with evidence in context.** Every important skill in the list should also appear in at least one experience or project bullet. Modern ATSs and recruiters weigh usage in context.
+- **K4 (P2) — Level and years.** Many forms ask for years of experience per skill. The profile keeps the level and, where possible, years or period (`2022–present`). No bars or scores in the CV.
+- **K5 (P3) — Hard skills in the list, soft skills in the bullets.** "Leadership" or "communication" are shown through achievements, not listed on their own.
 
-## 3. Bullets de experiencia
+## 3. Experience bullets
 
-- **B1 (P2) — Fórmula acción + qué + cómo + resultado.** `<Verbo> <qué> using <tecnología/método>, <resultado medible>`.
-- **B2 (P2) — Cuantificar.** %, dinero, tiempo ahorrado, usuarios, volumen (docs, requests), cantidad de clientes/proyectos, tamaño de equipo, países, presupuesto. Si no hay número exacto, un orden de magnitud confirmado por el usuario (`~`, `10+`). **Nunca inventar números.**
-- **B3 (P2) — Verbo de acción fuerte al inicio.** Pasado para roles terminados, presente para el actual. Sin pronombres ("I", "my").
-- **B4 (P2) — Sin afirmaciones absolutas ni inverificables.** Evitar "eliminate", "guarantee", "always", "zero". Usar "reduced X by Y" o "minimized".
-- **B5 (P3) — Sin relleno ni adjetivos vacíos.** Evitar "prestigious", "complex", "overarching", "fostering a culture of", "synergy". El resultado habla solo.
-- **B6 (P3) — Sin duplicados.** Dos bullets del mismo rol no dicen lo mismo con otras palabras. Se fusionan o se diferencian.
-- **B7 (P3) — Largo.** 1–2 líneas por bullet (≈ 15–35 palabras). En el CV: 3–6 bullets para roles recientes, 2–3 para los de más de 10 años. (El banco del perfil puede tener más.)
-- **B8 (P2) — Alcance y contexto.** Industria del cliente/empresa, tamaño, tipo de proyecto. Ayuda al match por dominio (p. ej. "insurance", "energy", "telecom").
+- **B1 (P2) — Action + what + how + result formula.** `<Verb> <what> using <technology/method>, <measurable result>`.
+- **B2 (P2) — Quantify.** %, money, time saved, users, volume (docs, requests), number of clients/projects, team size, countries, budget. Without an exact number, an order of magnitude confirmed by the user (`~`, `10+`). **Never invent numbers.**
+- **B3 (P2) — Strong action verb first.** Past tense for past roles, present tense for the current one. No pronouns ("I", "my").
+- **B4 (P2) — No absolute or unverifiable claims.** Avoid "eliminate", "guarantee", "always", "zero". Use "reduced X by Y" or "minimized".
+- **B5 (P3) — No filler or empty adjectives.** Avoid "prestigious", "complex", "overarching", "fostering a culture of", "synergy". The result speaks for itself.
+- **B6 (P3) — No duplicates.** Two bullets in the same role do not say the same thing in different words. Merge or differentiate them.
+- **B7 (P3) — Length.** 1–2 lines per bullet (≈ 15–35 words). In the CV: 3–6 bullets for recent roles, 2–3 for roles older than 10 years. (The profile's bank can hold more.)
+- **B8 (P2) — Scope and context.** The client's/company's industry, size, type of project. Helps domain matching (e.g. "insurance", "energy", "telecom").
 
 ## 4. Summary / Executive Profile
 
-- **U1 (P2) — 3–4 líneas.** Título objetivo + años de experiencia + 3–4 especialidades con keywords + un logro o diferencial.
-- **U2 (P3) — Sin primera persona ni clichés** ("passionate", "results-driven", "team player").
+- **U1 (P2) — 3–4 lines.** Target title + years of experience + 3–4 specialties with keywords + one achievement or differentiator.
+- **U2 (P3) — No first person or clichés** ("passionate", "results-driven", "team player").
 
-## 5. Qué NO hace la auditoría
+## 5. What the audit does NOT do
 
-- No inventa datos, métricas ni fechas. Si el usuario no sabe o no quiere, queda como está y se registra en `workspace/profile/audit.md`.
-- No cambia el significado de un logro al reescribirlo.
-- No edita el CV base ni la cover letter base sin aprobación.
+- It does not invent data, metrics or dates. If the user does not know or does not want to say, it stays as is and is recorded in `workspace/profile/audit.md`.
+- It does not change the meaning of an achievement when rewriting it.
+- It does not edit the base CV or the base cover letter without approval.

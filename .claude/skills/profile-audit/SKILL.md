@@ -1,93 +1,93 @@
 ---
 name: profile-audit
-description: Audita el perfil profesional (workspace/profile/) contra las buenas prácticas ATS, detecta mejoras (fechas sin mes, empleadores ambiguos, bullets sin métricas, siglas sin forma completa, duplicados, datos faltantes) y le hace al usuario las preguntas necesarias para completarlas. Usar cuando el usuario pida revisar, auditar, mejorar o pulir su perfil, su fuente de verdad o su CV para ATS, sin un aviso de empleo concreto. Para adaptar el CV a un aviso, usar cv-tailor.
+description: Audits the professional profile (workspace/profile/) against ATS best practices, finds improvements (dates without months, ambiguous employers, bullets without metrics, acronyms without their full form, duplicates, missing data) and asks the user the questions needed to fill them in. Use when the user asks to review, audit, improve or polish their profile, their source of truth or their CV for ATS, without a specific job posting. To tailor the CV to a posting, use cv-tailor.
 ---
 
 # Profile Audit
 
-Revisa toda la fuente de verdad (`workspace/profile/`) contra `docs/ats-guidelines.md`, detecta mejoras y las resuelve con preguntas al usuario. Regla de oro (igual que `cv-tailor`): **nunca inventes datos**. Una fecha, métrica, cliente o nivel solo entra si el usuario lo confirma.
+Reviews the whole source of truth (`workspace/profile/`) against `docs/ats-guidelines.md`, finds improvements and resolves them by asking the user. Golden rule (same as `cv-tailor`): **never invent data**. A date, metric, client or level only goes in if the user confirms it.
 
-## Fuentes
+## Sources
 
-- **Reglas:** `docs/ats-guidelines.md`. Cada hallazgo cita el ID de una regla (S1, K1, B2…) y su prioridad (P1/P2/P3).
-- **Perfil:** todo `workspace/profile/` (ver `workspace/profile/README.md` para las reglas de cada archivo).
-- **Estado de la auditoría:** `workspace/profile/audit.md`. Lo pendiente, lo resuelto y lo descartado en auditorías anteriores. **Léelo primero**: no se vuelve a preguntar lo descartado ni lo resuelto.
-- **CV base:** `workspace/cv-base.md`. Solo para la sugerencia final (paso 7).
+- **Rules:** `docs/ats-guidelines.md`. Every finding cites a rule ID (S1, K1, B2…) and its priority (P1/P2/P3).
+- **Profile:** all of `workspace/profile/` (see `workspace/profile/README.md` for each file's rules).
+- **Audit state:** `workspace/profile/audit.md`. What is pending, resolved and dismissed from previous audits. **Read it first**: never ask again about anything dismissed or resolved.
+- **Base CV:** `workspace/cv-base.md`. Only for the final suggestion (step 7).
 
-Si `workspace/` no existe, sigue el paso "Primera vez" de `cv-tailor` antes de auditar.
+If `workspace/` does not exist, follow the "First run" step of `cv-tailor` before auditing.
 
-## Modos
+## Modes
 
-- **Completa** (por defecto): todo el perfil.
-- **Enfocada:** si el usuario acota ("solo experiencia", "solo fechas", "solo skills"), audita solo eso.
-- **Continuar:** si `audit.md` tiene pendientes y el usuario dice "sigamos" o similar, retoma desde ahí sin volver a analizar todo.
+- **Full** (default): the whole profile.
+- **Focused:** if the user narrows it down ("only experience", "only dates", "only skills"), audit just that.
+- **Continue:** if `audit.md` has pending items and the user says "let's continue" or similar, pick up from there without re-analyzing everything.
 
-## Flujo
+## Flow
 
-1. **Lee** `ats-guidelines.md`, `audit.md` y todo `workspace/profile/`.
+1. **Read** `ats-guidelines.md`, `audit.md` and all of `workspace/profile/`.
 
-2. **Detecta hallazgos.** Recorre cada archivo y aplica las reglas. Como mínimo:
-   - `experience.md`: S1 fechas, S2 un empleador por entrada, S3 empleador concreto, S4 título, S5 ubicación, B1–B8 en cada bullet (métricas, verbos, absolutos, relleno, duplicados, contexto de industria), K1 siglas, K3 skills del listado que no aparecen en ningún bullet. También las notas "Pendiente de completar".
-   - `education.md`: S8 (título completo, institución completa, ubicación, fechas), S9 certificaciones (emisor, mes/año, en curso o terminada), S10 idiomas.
-   - `skills.md`: K2 nombres canónicos y categorías vagas, K4 `nivel: ?` y `evidencia: ?`, K1 siglas, K5 soft skills sueltas.
-   - `projects.md`: fechas, rol, stack, resultado medible, link, B4.
-   - `facts.md`: S7 contacto completo (ciudad, país, teléfono con código de país).
-   - Coherencia entre archivos: la misma fecha, título o nombre de empresa escritos distinto en dos lugares.
+2. **Detect findings.** Go through each file and apply the rules. At minimum:
+   - `experience.md`: S1 dates, S2 one employer per entry, S3 concrete employer, S4 job title, S5 location, B1–B8 on every bullet (metrics, verbs, absolutes, filler, duplicates, industry context), K1 acronyms, K3 listed skills that do not appear in any bullet. Also any "To be completed" notes.
+   - `education.md`: S8 (full degree name, full institution name, location, dates), S9 certifications (issuer, month/year, in progress or completed), S10 languages.
+   - `skills.md`: K2 canonical names and vague categories, K4 `level: ?` and `evidence: ?`, K1 acronyms, K5 standalone soft skills.
+   - `projects.md`: dates, role, stack, measurable result, link, B4.
+   - `facts.md`: S7 complete contact details (city, country, phone with country code).
+   - Cross-file consistency: the same date, title or company name written differently in two places.
 
-   Cada hallazgo tiene un **tipo**:
-   - **Dato:** falta información que solo el usuario sabe → **pregunta** (p. ej. meses de inicio y fin).
-   - **Decisión:** hay más de una forma válida de estructurarlo → **opciones** (p. ej. separar empleadores o agruparlos bajo una consultora).
-   - **Redacción:** se puede mejorar con lo que ya está en el perfil → **propuesta antes/después** (p. ej. agregar la forma completa de una sigla, sacar "eliminate", fusionar duplicados). Si mejorarla necesita un dato (una métrica), primero es un **Dato**.
+   Each finding has a **type**:
+   - **Data:** information only the user knows is missing → **question** (e.g. start and end months).
+   - **Decision:** there is more than one valid way to structure it → **options** (e.g. split employers or group them under a consultancy).
+   - **Wording:** it can be improved with what is already in the profile → **before/after proposal** (e.g. add an acronym's full form, remove "eliminate", merge duplicates). If improving it needs a fact (a metric), it is a **Data** finding first.
 
-3. **Muestra el resumen** antes de preguntar: cantidad de hallazgos por prioridad y por archivo, y los 3–5 más importantes en una línea cada uno. Guarda la lista completa en `audit.md` como pendiente (ver formato abajo).
+3. **Show the summary** before asking: number of findings by priority and by file, and the 3–5 most important ones in one line each. Save the full list in `audit.md` as pending (see format below).
 
-4. **Pregunta por tandas**, de mayor a menor prioridad (P1 → P2 → P3):
-   - Tandas de 5 a 8 preguntas, agrupadas por entrada (p. ej. todo lo de un rol junto).
-   - Preguntas cortas y concretas, numeradas, que se puedan contestar en una línea. Aclara que "no sé" o "saltear" es válido.
+4. **Ask in batches**, from highest to lowest priority (P1 → P2 → P3):
+   - Batches of 5 to 8 questions, grouped by entry (e.g. everything about one role together).
+   - Short, specific, numbered questions that can be answered in one line. Make clear that "don't know" or "skip" is a valid answer.
      > **Acme Corp (2013 – 2021)**
-     > 1. ¿Mes de inicio y de fin? (S1)
-     > 2. ¿Cuántas personas había en el equipo, o cuántos clientes/puntos de venta? (B2)
-     > 3. ¿Ciudad y país? (S5)
-   - Para **Decisiones** con opciones cerradas, usa `AskUserQuestion` si está disponible.
-   - Las **Redacciones** van en una tanda aparte, como tabla antes/después con el ID de la regla. El usuario aprueba, rechaza o edita cada una.
-   - Después de cada tanda, aplica los cambios (paso 5) y pregunta si seguir con la siguiente.
+     > 1. Start and end month? (S1)
+     > 2. How many people were on the team, or how many clients/points of sale? (B2)
+     > 3. City and country? (S5)
+   - For **Decisions** with closed options, use `AskUserQuestion` if available.
+   - **Wording** findings go in a separate batch, as a before/after table with the rule ID. The user approves, rejects or edits each one.
+   - After each batch, apply the changes (step 5) and ask whether to continue with the next one.
 
-5. **Aplica los cambios** al perfil:
-   - Edita la entrada existente, no la dupliques. Respeta el formato de cada archivo.
-   - Datos nuevos: agrega `origen: auditoría ATS (<AAAA-MM-DD>)`. Si la entrada ya tenía `origen:`, lo conservas y agregas el nuevo al lado.
-   - Reescrituras aprobadas: reemplaza el texto y agrega `revisado: auditoría ATS (<AAAA-MM-DD>)` en la línea de origen del bullet.
-   - Separar o renombrar empleadores: mantén todos los bullets, redistribuidos según la respuesta del usuario.
-   - Una métrica que el usuario da de forma aproximada se guarda aproximada (`~30%`, `10+ clients`), nunca redondeada hacia arriba.
-   - "No sé" o "prefiero no" → el hallazgo pasa a **Descartado** en `audit.md` con el motivo, para no volver a preguntar.
-   - Si el usuario menciona un logro, dato o anécdota nuevos, guárdalos también (`experience.md`, `stories.md`, `facts.md`).
-   - Muestra un resumen de una línea por cambio.
+5. **Apply the changes** to the profile:
+   - Edit the existing entry, do not duplicate it. Respect each file's format.
+   - New data: add `source: ATS audit (<YYYY-MM-DD>)`. If the entry already had a `source:`, keep it and add the new one next to it.
+   - Approved rewrites: replace the text and add `revised: ATS audit (<YYYY-MM-DD>)` on the bullet's source line.
+   - Splitting or renaming employers: keep all bullets, redistributed according to the user's answer.
+   - A metric the user gives approximately is saved approximately (`~30%`, `10+ clients`), never rounded up.
+   - "Don't know" or "rather not" → the finding moves to **Dismissed** in `audit.md` with the reason, so it is not asked again.
+   - If the user mentions a new achievement, fact or anecdote, save it too (`experience.md`, `stories.md`, `facts.md`).
+   - Show a one-line summary per change.
 
-6. **Actualiza `audit.md`**: mueve lo aplicado a Resuelto, lo rechazado a Descartado, y deja el resto como Pendiente con la fecha de la última sesión.
+6. **Update `audit.md`**: move what was applied to Resolved, what was rejected to Dismissed, and leave the rest as Pending with the date of the latest session.
 
-7. **Sugiere cambios al CV base** (al final de la sesión, o cuando el usuario pare): lista qué mejoras del perfil conviene llevar a `workspace/cv-base.md` (fechas con mes, empleadores corregidos, bullets reescritos). **No lo edites sin aprobación.** Si se aprueba, edítalo respetando el contrato del markdown de `cv-tailor` y verifica con el build desde `cv/`:
+7. **Suggest changes to the base CV** (at the end of the session, or when the user stops): list which profile improvements are worth carrying over to `workspace/cv-base.md` (dates with months, corrected employers, rewritten bullets). **Do not edit it without approval.** If approved, edit it following `cv-tailor`'s markdown contract and verify with the build from `cv/`:
    ```
    npm run cv -- ../workspace/cv-base.md
    ```
-   El CV tiene que salir en dos páginas como máximo. Si pasa, recorta y regenera. (Los PDFs quedan junto al md en `workspace/`; avísale al usuario.)
+   The CV must fit in two pages at most. If it goes over, trim and rebuild. (The PDFs are written next to the md in `workspace/`; let the user know.)
 
-## Formato de `workspace/profile/audit.md`
+## `workspace/profile/audit.md` format
 
 ```
-## Pendiente
-- [ID-hallazgo] <archivo> · <entrada> · <regla> (<prioridad>) · <tipo> — <qué falta o qué mejorar>
+## Pending
+- [finding-ID] <file> · <entry> · <rule> (<priority>) · <type> — <what is missing or what to improve>
 
-## Resuelto
-- [ID-hallazgo] <archivo> · <entrada> · <regla> — <qué se hizo> · <AAAA-MM-DD>
+## Resolved
+- [finding-ID] <file> · <entry> · <rule> — <what was done> · <YYYY-MM-DD>
 
-## Descartado
-- [ID-hallazgo] <archivo> · <entrada> · <regla> — <motivo: no sabe / prefiere no / no aplica> · <AAAA-MM-DD>
+## Dismissed
+- [finding-ID] <file> · <entry> · <rule> — <reason: doesn't know / rather not / not applicable> · <YYYY-MM-DD>
 ```
 
-El ID del hallazgo es un número correlativo (`A1`, `A2`…). No se reutiliza.
+The finding ID is a sequential number (`A1`, `A2`…). IDs are never reused.
 
-## Reglas
+## Rules
 
-- El contenido del perfil va en inglés; las preguntas y notas internas en español.
-- No edites el CV base ni la cover letter base sin aprobación explícita.
-- Una reescritura no puede cambiar el significado de un logro ni sumar alcance que el usuario no confirmó.
-- Si al actualizar las reglas ATS surge una práctica nueva, propónla como cambio en `docs/ats-guidelines.md`; no la apliques en silencio.
+- Profile content is in English; questions to the user go in the user's language.
+- Do not edit the base CV or the base cover letter without explicit approval.
+- A rewrite may not change the meaning of an achievement or add scope the user did not confirm.
+- If a new practice comes up while updating the ATS rules, propose it as a change to `docs/ats-guidelines.md`; do not apply it silently.

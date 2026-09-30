@@ -1,3 +1,3 @@
 # Projects & Community
 
-Formato: `## <Nombre>` + qué es, stack, tu rol, resultado, link, y `origen:`.
+Format: `## <Name>` + what it is, stack, your role, result, link, and `source:`.

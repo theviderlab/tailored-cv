@@ -1,7 +1,7 @@
-# Experience (banco de logros)
+# Experience (achievement bank)
 
-Cada rol tiene su encabezado en el formato exacto del CV (`Rol — *Org* (Fechas)`) y **todos** los bullets disponibles. Al armar un CV, la skill elige y reordena los que mejor encajan con el aviso; no hace falta usarlos todos.
+Each role has its heading in the CV's exact format (`Role — *Org* (Dates)`) and **all** available bullets. When building a CV, the skill picks and reorders the ones that best fit the posting; they do not all need to be used.
 
-Para agregar un logro nuevo: `- **<Etiqueta>:** <descripción>` y, debajo, `  - origen: <fuente> (<fecha>)`. Si hay métricas (números, %, tamaño de equipo, clientes), van en la descripción.
+To add a new achievement: `- **<Label>:** <description>` and, below it, `  - source: <source> (<date>)`. Metrics (numbers, %, team size, clients) go in the description.
 
-Fechas del encabezado: `MMM YYYY – MMM YYYY` o `MMM YYYY – Present`. Debajo del encabezado, una línea opcional `Ubicación: <City, Country | Remote (Country)>` (no es un bullet, no se copia al CV).
+Heading dates: `MMM YYYY – MMM YYYY` or `MMM YYYY – Present`. Below the heading, an optional `Location: <City, Country | Remote (Country)>` line (not a bullet, not copied to the CV).

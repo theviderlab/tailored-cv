@@ -91,7 +91,7 @@ const DEFAULT_LANG = 'en';
 function resolveLang(meta) {
   const lang = (process.env.CV_LANG || (meta && meta.lang) || DEFAULT_LANG).trim().toLowerCase();
   if (!I18N[lang]) {
-    console.error(`Idioma "${lang}" no definido en cv/i18n.json. Disponibles: ${Object.keys(I18N).join(', ')}.`);
+    console.error(`Language "${lang}" is not defined in cv/i18n.json. Available: ${Object.keys(I18N).join(', ')}.`);
     process.exit(1);
   }
   return lang;
@@ -102,7 +102,7 @@ function t(lang, key) {
   const get = (l) => key.split('.').reduce((o, k) => (o == null ? undefined : o[k]), I18N[l]);
   const val = get(lang);
   if (val !== undefined) return val;
-  console.warn(`Falta "${key}" para "${lang}" en cv/i18n.json; se usa "${DEFAULT_LANG}".`);
+  console.warn(`Missing "${key}" for "${lang}" in cv/i18n.json; falling back to "${DEFAULT_LANG}".`);
   return get(DEFAULT_LANG);
 }
 

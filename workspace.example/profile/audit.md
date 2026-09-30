@@ -1,11 +1,11 @@
-# Auditoría ATS (estado)
+# ATS audit (state)
 
-Estado de las auditorías de la skill `profile-audit` contra `docs/ats-guidelines.md`. Evita volver a preguntar lo resuelto o descartado.
+State of the `profile-audit` skill's audits against `docs/ats-guidelines.md`. Prevents asking again about anything resolved or dismissed.
 
-Última sesión: —
+Last session: —
 
-## Pendiente
+## Pending
 
-## Resuelto
+## Resolved
 
-## Descartado
+## Dismissed

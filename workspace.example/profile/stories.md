@@ -1,5 +1,5 @@
-# Stories (argumentos para cover letters)
+# Stories (cover letter arguments)
 
-Bloques reutilizables. La cover letter base (`workspace/cover-letter-base.md`) es una combinación de estos. Al adaptar una carta, la skill elige los que encajan con el aviso y los ajusta.
+Reusable blocks. The base cover letter (`workspace/cover-letter-base.md`) is a combination of these. When tailoring a letter, the skill picks the ones that fit the posting and adjusts them.
 
-Para agregar una historia nueva: `## <Tema>` + el texto + `origen:`. Las mejores historias tienen situación concreta, qué hiciste y resultado.
+To add a new story: `## <Topic>` + the text + `source:`. The best stories have a concrete situation, what you did and the result.

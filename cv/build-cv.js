@@ -195,14 +195,14 @@ function main() {
 
   const pages = countPdfPages(outPdf);
   if (pages === null) {
-    console.warn('No se pudo contar las paginas del PDF.');
+    console.warn('Could not count the PDF pages.');
     return;
   }
   if (pages > MAX_PAGES) {
-    console.warn(`ADVERTENCIA: el CV ocupa ${pages} paginas (max. ${MAX_PAGES}). Acorta el markdown.`);
+    console.warn(`WARNING: the CV is ${pages} pages long (max. ${MAX_PAGES}). Shorten the markdown.`);
     process.exit(1);
   }
-  console.log(`${pages} pagina(s) (max. ${MAX_PAGES}).`);
+  console.log(`${pages} page(s) (max. ${MAX_PAGES}).`);
 }
 
 main();

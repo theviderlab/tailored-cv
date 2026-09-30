@@ -1,11 +1,11 @@
 # Skills
 
-Formato de cada entrada:
+Format of each entry:
 
 ```
-- **<Skill>** — nivel: <basic | intermediate | advanced | expert | ?> · evidencia: <dónde/cuánto lo usó> · origen: <fuente> (<fecha>)
+- **<Skill>** — level: <basic | intermediate | advanced | expert | ?> · evidence: <where/how much it was used> · source: <source> (<date>)
 ```
 
-`?` = confirmado pero sin detalle todavía. Cuando se use esa skill en una postulación, conviene preguntar el detalle y completarlo.
+`?` = confirmed but without detail yet. When that skill is used in an application, it is worth asking for the detail and filling it in.
 
-Agrupar por categoría con `## <Categoría>` (p. ej. `## Programming`, `## Cloud & DevOps`, `## Management`).
+Group by category with `## <Category>` (e.g. `## Programming`, `## Cloud & DevOps`, `## Management`).

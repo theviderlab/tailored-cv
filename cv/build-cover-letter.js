@@ -134,21 +134,21 @@ function main() {
   if (report) {
     if (report.totalOverflowPx > 0) {
       overflow = true;
-      console.warn('OVERFLOW: el contenido excede una pagina por ' + report.totalOverflowPx + 'px.');
+      console.warn('OVERFLOW: the content exceeds one page by ' + report.totalOverflowPx + 'px.');
     }
     for (const b of report.blocks) {
       overflow = true;
-      console.warn('  - bloque "' + b.name + '" se desborda por ' + b.overflowPx + 'px.');
+      console.warn('  - block "' + b.name + '" overflows by ' + b.overflowPx + 'px.');
     }
   } else {
-    console.warn('No se pudo medir el overflow (Chrome no devolvio el reporte).');
+    console.warn('Could not measure overflow (Chrome did not return the report).');
   }
 
   if (overflow) {
-    console.warn('ADVERTENCIA: hay bloques que no entran en una pagina. Acorta la carta.');
+    console.warn('WARNING: some blocks do not fit on one page. Shorten the letter.');
     process.exit(1);
   } else if (report && report.freePx !== undefined) {
-    console.log('Headroom: ' + report.freePx + 'px libres en la pagina.');
+    console.log('Headroom: ' + report.freePx + 'px free on the page.');
   }
 }
 
