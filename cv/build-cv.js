@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const lib = require('./lib');
 
-const { md, esc, inlineToPlain, parseMd, renderHeader, findChrome, runPdf, fillTemplate } = lib;
+const { md, esc, inlineToPlain, splitFrontMatter, resolveLang, t, parseMd, renderHeader, findChrome, runPdf, fillTemplate } = lib;
 
 // Resolve paths relative to this script.
 const CV_DIR = __dirname;
@@ -12,15 +12,16 @@ const TMP_HTML = path.join(CV_DIR, 'design', '.tmp_cv.html');
 const MAX_PAGES = 2;
 
 // ---------------------------------------------------------------
-// Markdown section heading -> slot + standard ATS heading.
-// Keys match the markdown contract (see cv-tailor skill).
+// Markdown section heading -> slot. Keys match the markdown contract
+// (see cv-tailor skill); the rendered ATS heading comes from
+// cv/i18n.json ("sections.<key>") in the document's language.
 // ---------------------------------------------------------------
 const SECTIONS = {
-  'Executive Profile': { slot: 'summary', title: 'Summary' },
-  'Core Competencies & Technical Skills': { slot: 'skills', title: 'Skills' },
-  'Professional Experience': { slot: 'experience', title: 'Professional Experience' },
-  'Education & Certifications': { slot: 'education', title: 'Education & Certifications' },
-  'Community Leadership & Tech Advocacy': { slot: 'community', title: 'Volunteer Experience' },
+  'Executive Profile': { slot: 'summary' },
+  'Core Competencies & Technical Skills': { slot: 'skills' },
+  'Professional Experience': { slot: 'experience' },
+  'Education & Certifications': { slot: 'education' },
+  'Community Leadership & Tech Advocacy': { slot: 'community' },
 };
 
 // ---------------------------------------------------------------
@@ -96,19 +97,20 @@ function renderCommunity(title, blocks) {
   return html;
 }
 
-function renderSection(section) {
+function renderSection(section, lang) {
   const cfg = SECTIONS[section.heading];
   if (!cfg) return null;
+  const title = t(lang, 'sections.' + section.heading);
   switch (cfg.slot) {
     case 'summary':
-      return renderSummary(cfg.title, section.blocks);
+      return renderSummary(title, section.blocks);
     case 'skills':
     case 'education':
-      return renderList(cfg.title, section.blocks);
+      return renderList(title, section.blocks);
     case 'experience':
-      return renderExperience(cfg.title, section.blocks);
+      return renderExperience(title, section.blocks);
     case 'community':
-      return renderCommunity(cfg.title, section.blocks);
+      return renderCommunity(title, section.blocks);
     default:
       return null;
   }
@@ -145,9 +147,12 @@ function main() {
     process.exit(1);
   }
 
-  const data = parseMd(fs.readFileSync(mdPath, 'utf8'));
+  const text = fs.readFileSync(mdPath, 'utf8');
+  const lang = resolveLang(splitFrontMatter(text).meta);
+  const data = parseMd(text);
 
   const fragments = {
+    LANG: t(lang, 'htmlLang'),
     TITLE: `${inlineToPlain(data.name)} — ${inlineToPlain(data.headline)}`,
     HEADER: renderHeader(data),
     SUMMARY: '',
@@ -159,7 +164,7 @@ function main() {
 
   for (const section of data.sections) {
     const cfg = SECTIONS[section.heading];
-    if (cfg) fragments[cfg.slot.toUpperCase()] = renderSection(section);
+    if (cfg) fragments[cfg.slot.toUpperCase()] = renderSection(section, lang);
   }
 
   const template = fs.readFileSync(TEMPLATE_PATH, 'utf8');
@@ -186,7 +191,7 @@ function main() {
     process.exit(res.status || 1);
   }
 
-  console.log('OK -> ' + outPdf);
+  console.log(`OK (${lang}) -> ` + outPdf);
 
   const pages = countPdfPages(outPdf);
   if (pages === null) {

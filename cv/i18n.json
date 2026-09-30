@@ -1,0 +1,24 @@
+{
+  "en": {
+    "htmlLang": "en",
+    "sections": {
+      "Executive Profile": "Summary",
+      "Core Competencies & Technical Skills": "Skills",
+      "Professional Experience": "Professional Experience",
+      "Education & Certifications": "Education & Certifications",
+      "Community Leadership & Tech Advocacy": "Volunteer Experience"
+    },
+    "coverLetterTitle": "Cover Letter"
+  },
+  "es": {
+    "htmlLang": "es",
+    "sections": {
+      "Executive Profile": "Perfil profesional",
+      "Core Competencies & Technical Skills": "Habilidades",
+      "Professional Experience": "Experiencia profesional",
+      "Education & Certifications": "Formación y certificaciones",
+      "Community Leadership & Tech Advocacy": "Voluntariado"
+    },
+    "coverLetterTitle": "Carta de presentación"
+  }
+}

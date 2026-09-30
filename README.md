@@ -60,4 +60,4 @@ git config core.hooksPath .githooks
 
 ## Idioma
 
-Las skills y las notas internas están en español; el contenido del CV va en el idioma del aviso (normalmente inglés).
+Las skills y las notas internas están en español; el contenido del CV va en el idioma del aviso (normalmente inglés). Para un CV o una carta en otro idioma, empezá el markdown con front matter (`---` / `lang: es` / `---`): los títulos del PDF salen de `cv/i18n.json`, donde se pueden sumar idiomas.

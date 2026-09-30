@@ -1,4 +1,5 @@
 const fs = require('fs');
+const path = require('path');
 const { spawnSync } = require('child_process');
 
 const MarkdownIt = require('markdown-it');
@@ -63,10 +64,53 @@ function parseExperience(text) {
 }
 
 // ---------------------------------------------------------------
+// Front matter: optional leading block of "key: value" lines
+//   ---
+//   lang: es
+//   ---
+// ---------------------------------------------------------------
+function splitFrontMatter(text) {
+  const src = String(text).replace(/^﻿/, '');
+  const m = src.match(/^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/);
+  if (!m) return { meta: {}, body: src };
+  const meta = {};
+  for (const line of m[1].split(/\r?\n/)) {
+    const kv = line.match(/^\s*([A-Za-z0-9_-]+)\s*:\s*(.*?)\s*$/);
+    if (kv) meta[kv[1].toLowerCase()] = kv[2];
+  }
+  return { meta, body: src.slice(m[0].length) };
+}
+
+// ---------------------------------------------------------------
+// i18n: rendered labels per language (cv/i18n.json).
+// Language priority: CV_LANG env var > front matter "lang" > "en".
+// ---------------------------------------------------------------
+const I18N = JSON.parse(fs.readFileSync(path.join(__dirname, 'i18n.json'), 'utf8'));
+const DEFAULT_LANG = 'en';
+
+function resolveLang(meta) {
+  const lang = (process.env.CV_LANG || (meta && meta.lang) || DEFAULT_LANG).trim().toLowerCase();
+  if (!I18N[lang]) {
+    console.error(`Idioma "${lang}" no definido en cv/i18n.json. Disponibles: ${Object.keys(I18N).join(', ')}.`);
+    process.exit(1);
+  }
+  return lang;
+}
+
+// Label lookup with fallback to the default language.
+function t(lang, key) {
+  const get = (l) => key.split('.').reduce((o, k) => (o == null ? undefined : o[k]), I18N[l]);
+  const val = get(lang);
+  if (val !== undefined) return val;
+  console.warn(`Falta "${key}" para "${lang}" en cv/i18n.json; se usa "${DEFAULT_LANG}".`);
+  return get(DEFAULT_LANG);
+}
+
+// ---------------------------------------------------------------
 // Markdown -> structured data (CV)
 // ---------------------------------------------------------------
 function parseMd(text) {
-  const tokens = md.parse(text, {});
+  const tokens = md.parse(splitFrontMatter(text).body, {});
   const data = { name: '', headline: '', contact: [], sections: [] };
 
   let section = null; // { heading, blocks }
@@ -280,6 +324,9 @@ module.exports = {
   inlineToPlain,
   parseContact,
   parseExperience,
+  splitFrontMatter,
+  resolveLang,
+  t,
   parseMd,
   renderHeader,
   findChrome,

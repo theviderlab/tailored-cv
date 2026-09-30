@@ -70,6 +70,21 @@ El script `cv/build-cv.js` mapea el markdown a una plantilla HTML de una columna
 - Cada `###` de experiencia sigue exactamente `Rol — *Org* (Fechas)` (separado por em dash `—`). Fechas en formato `MMM YYYY – MMM YYYY` o `MMM YYYY – Present` cuando el perfil tiene los meses; si solo tiene el año, se usa el año.
 - Usa `**negrita**` para las etiquetas de cada bullet (p. ej. `**End-to-End AI Leadership:** ...`).
 
+### Idioma
+
+- Los títulos `##` del markdown son **claves fijas en inglés** en cualquier idioma: no se traducen. Los títulos que se ven en el PDF (y el `lang` del HTML) salen de `cv/i18n.json` según el idioma del documento.
+- Si el documento no está en inglés, empieza con front matter indicando el idioma (vale igual para el CV y la carta):
+
+  ```
+  ---
+  lang: es
+  ---
+  ```
+
+  Sin front matter se asume `en`. `CV_LANG=<código>` en el entorno tiene prioridad sobre el front matter.
+- Idiomas disponibles: los que tenga `cv/i18n.json` (hoy `en`, `es`). Para sumar uno, agrega su bloque con **todas** las claves de `en`; el build falla si el idioma no existe y avisa si falta alguna clave.
+- En un CV que no está en inglés, las fechas usan los meses de ese idioma (p. ej. `Feb 2021 – Actualidad`, `Oct 2013 – Ene 2021`), con el mismo formato en todo el documento.
+
 ## Contrato de la cover letter (obligatorio)
 
 `cv/build-cover-letter.js` parsea la carta; el nombre, headline y contacto los toma **automáticamente del CV base** (no se duplican en la carta). Formato de `workspace/output/<empresa>-<rol>/cover-letter-<empresa>-<rol>.md`:
@@ -146,7 +161,13 @@ Best regards,
    npm run cover -- ../workspace/output/<empresa>-<rol>/cover-letter-<empresa>-<rol>.md
    ```
 
-   Cada PDF se crea junto a su `.md`, dentro de la subcarpeta de la postulación. Si el CV pasa de 2 páginas o la carta reporta overflow, recorta ese texto y regenera.
+   Si la postulación no está en inglés, pasa el CV adaptado como segundo argumento de `npm run cover` para que el encabezado de la carta use su headline (en el idioma de la carta) en lugar de la del CV base:
+
+   ```
+   npm run cover -- ../workspace/output/<empresa>-<rol>/cover-letter-<empresa>-<rol>.md ../workspace/output/<empresa>-<rol>/cv-<empresa>-<rol>.md
+   ```
+
+   Cada PDF se crea junto a su `.md`, dentro de la subcarpeta de la postulación. Si el CV pasa de 2 páginas o la carta reporta overflow, recorta ese texto y regenera. Los bloques de experiencia no se parten entre páginas: si el primer rol no entra en la página 1, salta entero a la 2 y el CV puede pasar a 3 páginas aunque sobre espacio. En ese caso, acorta el perfil, las skills o los bullets del primer rol.
 
 9. **Registra la postulación** en `workspace/applications.md`: agrega una fila arriba con fecha, empresa, rol, carpeta, link del aviso (si lo hay), estado `enviada` (o `?` si el usuario no confirmó el envío) y notas breves (p. ej. idioma).
 
@@ -162,7 +183,7 @@ Best regards,
 ## Notas del build
 
 - Requiere Node (dep `markdown-it`) y Chrome/Edge instalados. `npm install` en `cv/` la primera vez.
-- `npm run cv` genera **un PDF** optimizado para ATS, `<nombre>.pdf`, junto al markdown (una columna; plantilla `cv/design/template.html` + `style.css`). Usa títulos estándar (Summary, Skills, Professional Experience, Education & Certifications, Volunteer Experience) sin cambiar el contrato del markdown.
+- `npm run cv` genera **un PDF** optimizado para ATS, `<nombre>.pdf`, junto al markdown (una columna; plantilla `cv/design/template.html` + `style.css`). Usa títulos estándar para ATS según el idioma del documento (definidos en `cv/i18n.json`; en inglés: Summary, Skills, Professional Experience, Education & Certifications, Volunteer Experience) sin cambiar el contrato del markdown. Ver "Idioma".
 - **El CV puede ocupar hasta 2 páginas.** Si pasa de 2, el build **termina con código 1**: acorta el markdown (recorta bullets o reescribe el perfil) hasta que salga limpio, antes de entregar el PDF.
 - El build de la cover letter (`npm run cover`) usa como base de identidad `workspace/cv-base.md`; se puede sobreescribir con `CV_BASE=...` o un segundo argumento.
 - Si el usuario quiere inspeccionar el HTML intermedio: `CV_KEEP_HTML=1 npm run cv -- <md>` conserva `cv/design/.tmp_cv.html` (o `.tmp_cover.html` para la carta).

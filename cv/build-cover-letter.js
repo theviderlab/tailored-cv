@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const lib = require('./lib');
 
-const { md, esc, inlineToPlain, parseMd, renderHeader, findChrome, runPdf, injectReporter, measureOverflow, fillTemplate } = lib;
+const { md, esc, inlineToPlain, splitFrontMatter, resolveLang, t, parseMd, renderHeader, findChrome, runPdf, injectReporter, measureOverflow, fillTemplate } = lib;
 
 // Resolve paths relative to this script.
 const CV_DIR = __dirname;
@@ -88,10 +88,13 @@ function main() {
   }
 
   const cvData = parseMd(fs.readFileSync(cvBasePath, 'utf8'));
-  const letter = parseCoverLetter(fs.readFileSync(letterPath, 'utf8'));
+  const { meta, body } = splitFrontMatter(fs.readFileSync(letterPath, 'utf8'));
+  const lang = resolveLang(meta);
+  const letter = parseCoverLetter(body);
 
   const fragments = {
-    TITLE: `${inlineToPlain(cvData.name)} — Cover Letter`,
+    LANG: t(lang, 'htmlLang'),
+    TITLE: `${inlineToPlain(cvData.name)} — ${t(lang, 'coverLetterTitle')}`,
     HEADER: renderHeader(cvData),
     BODY: renderBody(letter),
     SIGNATURE: esc(letter.signature),
@@ -125,7 +128,7 @@ function main() {
     process.exit(res.status || 1);
   }
 
-  console.log('OK -> ' + outPdf);
+  console.log(`OK (${lang}) -> ` + outPdf);
 
   let overflow = false;
   if (report) {
