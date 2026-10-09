@@ -1,6 +1,9 @@
 # Personal data: profile, CVs, applications. Versioned separately (your own private repo).
 workspace/
 
+# Personal website (its own public repo, deployed to viderlab.com).
+site/
+
 # Build
 cv/node_modules/
 cv/design/.tmp_*.html
