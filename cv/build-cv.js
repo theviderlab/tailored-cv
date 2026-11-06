@@ -9,7 +9,9 @@ const CV_DIR = __dirname;
 const TEMPLATE_PATH = path.join(CV_DIR, 'design', 'template.html');
 const TMP_HTML = path.join(CV_DIR, 'design', '.tmp_cv.html');
 
-const MAX_PAGES = 2;
+// Page limit. CV_MAX_PAGES overrides it for a single build (e.g. a recruiter
+// asking for the full career history); the default stays at 2.
+const MAX_PAGES = Number.parseInt(process.env.CV_MAX_PAGES, 10) || 2;
 
 // ---------------------------------------------------------------
 // Markdown section heading -> slot. Keys match the markdown contract
@@ -168,7 +170,13 @@ function main() {
   }
 
   const template = fs.readFileSync(TEMPLATE_PATH, 'utf8');
-  const html = fillTemplate(template, fragments);
+  let html = fillTemplate(template, fragments);
+  // CV_SPLIT_FIRST_JOB=1 lets only the first role break across pages, for an
+  // extended CV whose first role no longer fits on page 1. Off by default.
+  if (process.env.CV_SPLIT_FIRST_JOB === '1') {
+    html = html.replace('</head>',
+      '<style>article.job:first-of-type { break-inside: auto; page-break-inside: auto; }</style>\n</head>');
+  }
   fs.writeFileSync(TMP_HTML, html, 'utf8');
 
   const chrome = findChrome();

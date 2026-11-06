@@ -186,7 +186,7 @@ Best regards,
 
 - Requires Node (`markdown-it` dependency) and Chrome/Edge installed. Run `npm install` in `cv/` the first time.
 - `npm run cv` generates **one ATS-optimized PDF**, `<name>.pdf`, next to the markdown (single column; template `cv/design/template.html` + `style.css`). It uses standard ATS headings in the document's language (defined in `cv/i18n.json`; in English: Summary, Skills, Professional Experience, Education & Certifications, Volunteer Experience) without changing the markdown contract. See "Language".
-- **The CV can be up to 2 pages.** If it goes over 2, the build **exits with code 1**: shorten the markdown (trim bullets or rewrite the summary) until it builds cleanly, before delivering the PDF.
+- **The CV can be up to 2 pages.** If it goes over 2, the build **exits with code 1**: shorten the markdown (trim bullets or rewrite the summary) until it builds cleanly, before delivering the PDF. Only when the user explicitly asks for a longer CV (e.g. a recruiter wants the full career history), raise the limit for that one build with `CV_MAX_PAGES=<n>`; if the first role then no longer fits on page 1 and leaves a gap, add `CV_SPLIT_FIRST_JOB=1` so only that role can break across pages. Never use either flag for a normal application.
 - The cover letter build (`npm run cover`) takes its identity from `workspace/cv-base.md`; this can be overridden with `CV_BASE=...` or a second argument.
 - If the user wants to inspect the intermediate HTML: `CV_KEEP_HTML=1 npm run cv -- <md>` keeps `cv/design/.tmp_cv.html` (or `.tmp_cover.html` for the letter).
 - Styles live in `cv/design/style.css` (CV) and `cv/design/style-cover-letter.css`; do not edit the CSS unless the user asks.
