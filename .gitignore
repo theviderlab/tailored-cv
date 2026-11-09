@@ -10,3 +10,9 @@ cv/design/.tmp_*.html
 
 # Local tools
 .opencode/node_modules/
+
+# Interview recorder: ad-hoc test recordings and transcripts (real ones live in workspace/)
+tools/interview-recorder/*.flac
+tools/interview-recorder/*.wav
+tools/interview-recorder/transcript.md
+tools/interview-recorder/__pycache__/

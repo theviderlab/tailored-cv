@@ -10,6 +10,7 @@ The core idea is a **professional profile that grows with use**: whenever a post
 |---|---|
 | `.claude/skills/cv-tailor/` | Reads the posting (link or text), matches it against your profile, asks you what is missing, writes the tailored CV and cover letter and generates the PDFs. |
 | `.claude/skills/profile-audit/` | Reviews your profile against ATS best practices and asks you the questions needed to improve it. |
+| `.claude/skills/interview/` + `tools/interview-recorder/` | Records an online interview, transcribes it locally and reviews your answers (optional, Windows). |
 | `docs/ats-guidelines.md` | The ATS rules both skills apply. |
 | `cv/` | Markdown → PDF build with Node and headless Chrome/Edge. |
 | `workspace.example/` | Empty template for your personal workspace. |
@@ -55,6 +56,17 @@ workspace/output/<company>-<role>/
 ```
 
 Other things you can ask: *"update the Acme application to interview"*, *"add to my profile that I use Terraform"*, or `/profile-audit` to polish the profile for ATS without a specific posting.
+
+## Interview debriefs (optional, Windows)
+
+Once you get interviews, the `interview` skill records the call (your microphone and the call audio on separate tracks), transcribes it **on your machine** with Whisper and writes a review: the questions you were asked, how you answered, better answers built from your profile, and what you learned about the role.
+
+```
+/interview start acme technical     # before the call
+/interview stop                     # after it: transcribe + review
+```
+
+The audio never leaves your PC; only the transcript reaches the model. Requires [uv](https://docs.astral.sh/uv/); an NVIDIA GPU makes it faster. See [tools/interview-recorder/README.md](tools/interview-recorder/README.md).
 
 ## Your workspace
 
