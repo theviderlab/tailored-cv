@@ -2,7 +2,7 @@
 
 Record an online job interview on your PC, transcribe it **locally**, and let the agent review it: the questions you were asked, how you answered, better answers, and what you learned about the role.
 
-It is usually driven by the [`interview` skill](../../.claude/skills/interview/SKILL.md) (`/interview start`, `/interview stop`, `/interview review`), but both scripts work on their own.
+It is usually driven by the [`interview` skill](../../.claude/skills/interview/SKILL.md) (`/interview start`, `/interview stop`, `/interview review`, `/interview prep`), but both scripts work on their own.
 
 ## Why
 

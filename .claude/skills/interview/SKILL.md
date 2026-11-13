@@ -1,13 +1,13 @@
 ---
 name: interview
-description: Records an online job interview locally (microphone + system audio), transcribes it on the user's machine with Whisper and reviews it - questions asked, how the user answered, better answers, new facts about the role and next steps - updating the application log and the profile. Use when the user says they are about to start an interview or call, asks to record, stop or transcribe one, or wants to review / debrief an interview transcript (/interview start, /interview stop, /interview review).
+description: Records an online job interview locally (microphone + system audio), transcribes it on the user's machine with Whisper and reviews it - questions asked, how the user answered, better answers, new facts about the role and next steps - updating the application log and the profile. Keeps a question bank across all interviews (grouped questions, how each was answered over time, best answer) and uses it to prepare the next interview for a given job posting. Use when the user says they are about to start an interview or call, asks to record, stop or transcribe one, wants to review / debrief an interview transcript, or wants to prepare for an upcoming interview (/interview start, /interview stop, /interview review, /interview prep).
 ---
 
 # Interview
 
-Records an online interview, transcribes it **locally** and reviews it. The audio never leaves the user's machine: only the transcript text reaches the model.
+Records an online interview, transcribes it **locally** and reviews it. The audio never leaves the user's machine: only the transcript text reaches the model. Every review feeds a **question bank** shared by all applications, which `/interview prep` uses to predict and rehearse the questions of the next interview.
 
-Talk to the user in their own language. Write `review.md` in the user's language; quotes from the transcript stay in the interview's language.
+Talk to the user in their own language. Write `review.md`, the question bank and prep sheets in the user's language; quotes from the transcript stay in the interview's language.
 
 Golden rule (same as `cv-tailor`): **never invent data**. Improved answers use only facts from the profile (`workspace/profile/`) or from the transcript.
 
@@ -32,7 +32,9 @@ workspace/output/<company>-<role>/interviews/<YYYY-MM-DD>-<stage>/
 └── review.md
 ```
 
-`<stage>` is a short slug for the round (`recruiter`, `technical`, `manager`, `case`, `final`…). If the application has no folder yet, create `workspace/output/<company>-<role>/` with the same slug rules as `cv-tailor`. Everything stays inside `workspace/` (git-ignored).
+`<stage>` is a short slug for the round (`recruiter`, `technical`, `manager`, `case`, `final`…). If the application has no folder yet, create `workspace/output/<company>-<role>/` with the same slug rules as `cv-tailor`. Prep sheets go in the application folder as `prep-<YYYY-MM-DD>-<stage>.md`.
+
+The question bank lives in `workspace/interview-bank/` (`index.md`, `experience.md`, `technical.md`); its format is in [question-bank.md](question-bank.md). Read that file before creating or updating the bank. Everything stays inside `workspace/` (git-ignored).
 
 ## /interview start [application] [stage]
 
@@ -84,12 +86,42 @@ Without an argument, use the most recent `transcript.md` without a `review.md` n
    - **What they told us:** new facts about the role, team, stack, process, compensation, benefits, location or work mode, with timestamps.
    - **Questions the user asked** and what was answered; questions worth asking next time.
    - **Next steps and preparation:** what comes next in the process and what to prepare, most important first.
-4. **Propose updates** in one message, one line each, and apply them once the user confirms:
+4. **Update the question bank** (format in [question-bank.md](question-bank.md)). If `workspace/interview-bank/` does not exist, create it; if earlier `review.md` files exist that are not in its **Interviews included** table, offer to merge them first, oldest first, so the history keeps its order. Then, for each substantive question of this interview (not salary or logistics):
+   - find the group that tests the same ability, reading `index.md` first and opening only the files it points to;
+   - if there is one: add the wording under **How it was asked** if it is new, add a **History** line with the rating (✅ / ⚠️ / ❌, the same judgment as the review), recompute **Status** and **Asked**, update the **Best answer** (the user's own answer when it was ✅), and add any new **JD signals**;
+   - if there is none: create a group with the next ID, under an existing theme or a new one;
+   - update the index rows and add the interview to **Interviews included**.
+
+   Write it directly: it is derived from the review, not new facts about the user. Report it in step 5 as one line (e.g. "bank: 4 questions updated, 2 new; T-007 went from weak to good").
+5. **Propose updates** in one message, one line each, and apply them once the user confirms:
    - `workspace/applications.md`: status (e.g. `interview`) and a short note about this round.
    - **Profile:** new facts the user stated about themselves (achievements, metrics, skills, anecdotes) go to the matching file with `source: interview <company>-<role> (<YYYY-MM-DD>)`, following the rules in `workspace/profile/README.md`. A strong answer can become a reusable entry in `stories.md`.
    - **Application notes:** facts about the company or role go to a notes file in the application folder (an existing one if there is one, such as `company-research.md`).
    - If the agent keeps persistent memory about the user's job search, update it with the process stage and next steps.
-5. Finish with the three or four most useful takeaways in the chat, and the path to `review.md`.
+6. Finish with the three or four most useful takeaways in the chat, and the path to `review.md`.
+
+## /interview prep [application] [stage]
+
+Prepares the next interview of an application from the question bank. It reads the bank but never changes it: only real interviews (`/interview review`) do.
+
+1. **Read the context:** the application folder (job description or posting, tailored CV, company research, interviewer profiles, earlier reviews of this application), its row in `workspace/applications.md`, `workspace/profile/` and `workspace/interview-bank/index.md`. Ask for the stage only if it is not obvious (screening, technical, manager, executive…). If the posting text is missing, ask for it.
+2. **Estimate how likely each bank question is**, from the index:
+   - **JD match:** its JD signals appear in the posting (strong if they are core requirements, medium if secondary);
+   - **stage fit:** its Type and Stages fit this round (a screening asks experience and motivation; a technical round asks concepts and design; an executive round asks impact, leadership and judgment);
+   - **frequency:** asked many times across companies means likely anywhere.
+
+   Rate each as high, medium or low. Experience questions that come up in almost every interview (introduction, key projects) are always high.
+3. **Predict new questions:** core requirements of the posting that no bank question covers. Mark them as **new, not asked yet**, and draft their answers from the profile. If the profile has nothing to back a requirement (or it is in `gaps.md`), say so and draft an honest answer.
+4. **Prioritize by probability × weakness:** first high-probability questions with status `weak`, `regressed`, `fair` or `unrated` and the new ones; then high-probability `good`; `mastered` questions only as a one-line reminder. Low-probability questions are left out unless the list is short.
+5. **Write `prep-<YYYY-MM-DD>-<stage>.md`** in the application folder:
+   - **What to expect:** stage, interviewers if known, the posting's three or four themes most likely to be probed.
+   - **Questions to rehearse**, in priority order: the question and its ID, probability and why (which signal or frequency), status and the last time it was asked, best answer (~30 s), key points, honesty notes. Copy from the bank, adapted to this posting: point the answer at what this company needs.
+   - **New questions** (not in the bank) with draft answers.
+   - **Questions to ask them**, fit for the stage and the interviewer.
+   - **Reminders:** recurring lessons from the bank's history (e.g. "structure first, then the example"; "don't answer with tools when asked for patterns").
+
+   If the interview language is unknown, add the best answers of the high-probability questions in the other likely language too. If a prep sheet or a hand-made question list already exists in the folder, ask before replacing it.
+6. Finish in the chat with the five questions to rehearse first and the path to the prep sheet.
 
 ## Troubleshooting
 

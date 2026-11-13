@@ -10,7 +10,7 @@ The core idea is a **professional profile that grows with use**: whenever a post
 |---|---|
 | `.claude/skills/cv-tailor/` | Reads the posting (link or text), matches it against your profile, asks you what is missing, writes the tailored CV and cover letter and generates the PDFs. |
 | `.claude/skills/profile-audit/` | Reviews your profile against ATS best practices and asks you the questions needed to improve it. |
-| `.claude/skills/interview/` + `tools/interview-recorder/` | Records an online interview, transcribes it locally and reviews your answers (optional, Windows). |
+| `.claude/skills/interview/` + `tools/interview-recorder/` | Records an online interview, transcribes it locally, reviews your answers and keeps a question bank to prepare the next interviews (recording: optional, Windows). |
 | `docs/ats-guidelines.md` | The ATS rules both skills apply. |
 | `cv/` | Markdown → PDF build with Node and headless Chrome/Edge. |
 | `workspace.example/` | Empty template for your personal workspace. |
@@ -67,6 +67,18 @@ Once you get interviews, the `interview` skill records the call (your microphone
 ```
 
 The audio never leaves your PC; only the transcript reaches the model. Requires [uv](https://docs.astral.sh/uv/); an NVIDIA GPU makes it faster. See [tools/interview-recorder/README.md](tools/interview-recorder/README.md).
+
+### Question bank
+
+Interviewers keep asking the same handful of questions with different wording, so every review also feeds `workspace/interview-bank/`: questions grouped by what they test, split into experience and technical, each with the history of how you answered it (✅ good, ⚠️ fair, ❌ poor), a status where your latest answers weigh most, and the best answer so far. The themes are not predefined: they grow out of your own interviews.
+
+Before the next interview, prepare from it:
+
+```
+/interview prep acme technical
+```
+
+The agent matches the posting against the bank, estimates which questions are most likely for that role and stage, adds likely questions you have not been asked yet, and writes a prep sheet that puts the likely questions you answer worst first. A review you paste from elsewhere (e.g. Teams' transcription) feeds the bank too, so it works without the recorder.
 
 ## Your workspace
 
