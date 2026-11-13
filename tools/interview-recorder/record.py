@@ -8,8 +8,11 @@ Windows only: system audio is captured through WASAPI loopback, so it works with
 Teams, Zoom, Meet or any other app without bots or integrations.
 
 Usage:
-    uv run record.py --out <dir> [--seconds N]
-    uv run record.py --list
+    uv run record.py --out <dir> [--mic NAME] [--seconds N]
+    uv run record.py --list [--mic NAME]
+
+The microphone is the Windows default input unless --mic picks another one by part of
+its name. Use the same microphone the call app uses, so the ME track sounds like you.
 
 Writes <dir>/me.flac and <dir>/them.flac. Stops after --seconds, on Ctrl+C, or when
 a file named STOP appears in <dir>. While recording, <dir>/recording.lock holds the
@@ -33,9 +36,25 @@ import pyaudiowpatch as pyaudio
 import soundfile as sf
 
 
-def find_devices(p):
+def input_devices(p):
+    """WASAPI microphones (loopback devices excluded)."""
     wasapi = p.get_host_api_info_by_type(pyaudio.paWASAPI)
-    mic = p.get_device_info_by_index(wasapi["defaultInputDevice"])
+    return [
+        d for d in (p.get_device_info_by_host_api_device_index(wasapi["index"], i) for i in range(wasapi["deviceCount"]))
+        if d["maxInputChannels"] > 0 and not d.get("isLoopbackDevice")
+    ]
+
+
+def find_devices(p, mic_name=None):
+    wasapi = p.get_host_api_info_by_type(pyaudio.paWASAPI)
+    if mic_name:
+        matches = [d for d in input_devices(p) if mic_name.lower() in d["name"].lower()]
+        if not matches:
+            names = ", ".join(d["name"] for d in input_devices(p))
+            sys.exit(f"No microphone matches '{mic_name}'. Available: {names}")
+        mic = matches[0]
+    else:
+        mic = p.get_device_info_by_index(wasapi["defaultInputDevice"])
     spk = p.get_device_info_by_index(wasapi["defaultOutputDevice"])
     if not spk.get("isLoopbackDevice"):
         for lb in p.get_loopback_device_info_generator():
@@ -105,14 +124,18 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--out", type=Path, help="output directory")
     ap.add_argument("--seconds", type=float, default=0, help="stop after N seconds (0 = until Ctrl+C or STOP file)")
-    ap.add_argument("--list", action="store_true", help="show the devices that would be used and exit")
+    ap.add_argument("--mic", help="microphone to record (part of its name, as shown by --list); default: Windows default input")
+    ap.add_argument("--list", action="store_true", help="show the devices that would be used, list all microphones, and exit")
     args = ap.parse_args()
 
     p = pyaudio.PyAudio()
-    mic, spk = find_devices(p)
+    mic, spk = find_devices(p, args.mic)
     print(f"Mic (ME):     {mic['name']} @ {int(mic['defaultSampleRate'])} Hz, {mic['maxInputChannels']} ch")
     print(f"System (THEM): {spk['name']} @ {int(spk['defaultSampleRate'])} Hz, {spk['maxInputChannels']} ch")
     if args.list:
+        print("Available microphones (pass part of a name to --mic):")
+        for d in input_devices(p):
+            print(f"  {'*' if d['index'] == mic['index'] else ' '} {d['name']}")
         return
     if not args.out:
         sys.exit("--out is required")

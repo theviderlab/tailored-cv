@@ -19,8 +19,10 @@ the track (ME / THEM) without diarization. Segments are merged by timestamp into
     [00:03:12] THEM: How would you approach chunking for a large codebase?
     [00:03:20] ME: ...
 
-Pass --lang when you know the interview language: auto-detection picks one language
-per track, and a mixed-language track gets garbled.
+Without --lang, the language is detected once from the speech on both tracks together
+(a few 30 s windows each) and that single language is used for both tracks. This beats
+Whisper's own per-track detection, which can pick a different language for each track
+and garble a track that mixes languages. Pass --lang to skip detection.
 If CUDA cannot be loaded, it falls back to the CPU (slower, same output).
 
 Transcription is the heavy step (GPU, several CPU cores, up to a few GB of RAM on an
@@ -100,6 +102,23 @@ def load_model(name, device):
     return WhisperModel(name, device="cpu", compute_type="int8"), "cpu"
 
 
+def detect_language(model, audios, windows=4):
+    """Pick one language for the whole interview by summing detection scores over all tracks."""
+    scores = {}
+    for audio in audios:
+        try:
+            _, _, probs = model.detect_language(audio, vad_filter=True, language_detection_segments=windows)
+        except Exception as e:  # e.g. a silent track: VAD leaves nothing to detect on
+            print(f"Language detection skipped a track ({e})", flush=True)
+            continue
+        for lang, p in probs:
+            scores[lang] = scores.get(lang, 0.0) + p
+    if not scores:
+        return None, 0.0
+    lang = max(scores, key=scores.get)
+    return lang, scores[lang] / sum(scores.values())
+
+
 def fmt(t):
     t = int(t)
     return f"{t // 3600:02d}:{t % 3600 // 60:02d}:{t % 60:02d}"
@@ -121,7 +140,7 @@ def merge(segments):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("dir", type=Path, help="recording directory (with me.flac / them.flac)")
-    ap.add_argument("--lang", default=None, help="interview language code (en, es, ...); default: auto-detect per track")
+    ap.add_argument("--lang", default=None, help="interview language code (en, es, ...); default: detect one language from both tracks")
     ap.add_argument("--model", default="large-v3-turbo", help="faster-whisper model (default: large-v3-turbo)")
     ap.add_argument("--device", default="cuda", choices=("cuda", "cpu"))
     ap.add_argument("--delete-audio", action="store_true", help="delete the FLAC files after a successful transcription")
@@ -142,10 +161,17 @@ def main():
     model, device = load_model(args.model, args.device)
     print(f"Model {args.model} on {device} loaded in {time.time() - t:.1f} s", flush=True)
 
+    audios = {speaker: load_16k(path) for speaker, path in tracks}
+    lang = args.lang
+    if not lang:
+        lang, share = detect_language(model, audios.values())
+        print(f"Detected language: {lang} ({share:.0%} of the detection score)" if lang
+              else "Language detection found no speech; Whisper will detect per track", flush=True)
+
     segments = []
-    for speaker, path in tracks:
+    for speaker, _ in tracks:
         t = time.time()
-        segs, info = model.transcribe(load_16k(path), language=args.lang, vad_filter=True, beam_size=5)
+        segs, info = model.transcribe(audios[speaker], language=lang, vad_filter=True, beam_size=5)
         segs = list(segs)
         print(f"{speaker}: {info.duration:.0f} s of audio, lang={info.language} ({info.language_probability:.2f}), "
               f"{len(segs)} segments in {time.time() - t:.1f} s", flush=True)
@@ -153,7 +179,7 @@ def main():
 
     out = args.dir / "transcript.md"
     out.write_text("# Transcript\n\n" + "\n\n".join(merge(segments)) + "\n", encoding="utf-8")
-    print(f"Wrote {out}")
+    print(f"Wrote {out} (language: {lang or 'per track'})")
 
     if args.delete_audio:
         for _, path in tracks:

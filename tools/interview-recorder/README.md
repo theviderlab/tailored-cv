@@ -40,16 +40,19 @@ The first transcription downloads several GB (CUDA libraries and the `large-v3-t
 ```sh
 cd tools/interview-recorder
 
-uv run record.py --list                      # which mic and output device will be used
+uv run record.py --list                      # which mic and output device will be used, plus all mics
 uv run record.py --out <dir>                 # record until Ctrl+C (or until <dir>/STOP exists)
+uv run record.py --out <dir> --mic "Pixel"   # record a specific mic (part of its name)
 uv run record.py --out <dir> --seconds 60    # quick test
 
-uv run transcribe.py <dir> --lang en         # writes <dir>/transcript.md
+uv run transcribe.py <dir>                   # detects the language, writes <dir>/transcript.md
 uv run transcribe.py <dir> --lang es --delete-audio
 uv run transcribe.py <dir> --device cpu --model medium
 ```
 
-Pass `--lang` when you know the interview language. Auto-detection picks one language per track, and a track that mixes languages comes out garbled.
+**Microphone:** by default the recorder uses the Windows default input, which is not always the one the call app uses (e.g. headset in Teams, webcam as the Windows default). Pass `--mic` with the one the call uses.
+
+**Language:** without `--lang`, the language is detected once from the speech on both tracks together and used for both. That works when you don't know the language in advance. Whisper's own detection works per track and can garble a track. Pass `--lang` when you know it, or to re-run after a wrong detection.
 
 ## Reference numbers
 

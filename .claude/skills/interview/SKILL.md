@@ -15,9 +15,9 @@ Golden rule (same as `cv-tailor`): **never invent data**. Improved answers use o
 
 The engine lives in `tools/interview-recorder/` (see its `README.md`). Both scripts are self-contained [uv](https://docs.astral.sh/uv/) scripts: `uv run` installs Python 3.12 and the dependencies on first use. Run them from that folder.
 
-- `record.py --out <dir>`: records `me.flac` (microphone) and `them.flac` (system audio via WASAPI loopback). **Windows only.** While running it keeps `<dir>/recording.lock`; it stops when `<dir>/STOP` appears, on Ctrl+C, or after `--seconds N`.
-- `record.py --list`: shows which microphone and output device would be used.
-- `transcribe.py <dir> --lang <code> [--delete-audio]`: writes `<dir>/transcript.md` with lines like `[00:03:12] THEM: ...` / `[00:03:20] ME: ...`. Uses the NVIDIA GPU if available, otherwise the CPU. The first run downloads several GB (CUDA libraries and the model).
+- `record.py --out <dir> [--mic <name>]`: records `me.flac` (microphone) and `them.flac` (system audio via WASAPI loopback). **Windows only.** The microphone is the Windows default input unless `--mic` picks another by part of its name. While running it keeps `<dir>/recording.lock`; it stops when `<dir>/STOP` appears, on Ctrl+C, or after `--seconds N`.
+- `record.py --list [--mic <name>]`: shows which microphone and output device would be used, and lists every microphone.
+- `transcribe.py <dir> [--lang <code>] [--delete-audio]`: writes `<dir>/transcript.md` with lines like `[00:03:12] THEM: ...` / `[00:03:20] ME: ...`. Without `--lang` it detects one language from both tracks and prints it (`Detected language: ...`). Uses the NVIDIA GPU if available, otherwise the CPU. The first run downloads several GB (CUDA libraries and the model).
 
 If `uv` is missing, tell the user to install it (`winget install astral-sh.uv`) and stop.
 
@@ -38,8 +38,8 @@ workspace/output/<company>-<role>/interviews/<YYYY-MM-DD>-<stage>/
 
 1. **Find the application.** Match what the user said against the folders in `workspace/output/` and the rows of `workspace/applications.md`. If it is ambiguous or missing, ask (one short question). Ask for the stage only if it is not obvious.
 2. **Check nothing is already recording:** look for `workspace/output/*/interviews/*/recording.lock`. If one exists, tell the user and ask whether to stop it first.
-3. **Check the devices:** run `uv run record.py --list` and show the two device names. If the microphone looks like a built-in laptop mic and the output like laptop speakers, warn in one line: without headphones, the interviewers' voices leak into the ME track; use headphones.
-4. **Start the recording detached from this session**, so it survives if the editor or the session restarts. From PowerShell:
+3. **Check the devices:** run `uv run record.py --list` and show the two device names plus the list of microphones. Ask in one line which microphone the call app (Teams, Meet, Zoom) is using, since it is often not the Windows default (e.g. headset mic in the call, webcam mic as default). If it differs, pass it with `--mic <part of its name>`. Bluetooth headsets appear only while connected. If the microphone looks like a built-in laptop mic and the output like laptop speakers, warn in one line: without headphones, the interviewers' voices leak into the ME track; use headphones.
+4. **Start the recording detached from this session**, so it survives if the editor or the session restarts. From PowerShell (add `'--mic', '"<name>"'` to the list when needed):
 
    ```powershell
    Start-Process -FilePath uv -ArgumentList @('run', '"<abs path>\tools\interview-recorder\record.py"', '--out', '"<abs path to the interview folder>"') -WindowStyle Minimized
@@ -57,15 +57,15 @@ Do nothing else while the interview runs. Never offer live help or answers durin
 
 1. Find the running recording (`recording.lock`, see above). If there is none but a folder has `me.flac`/`them.flac` and no `transcript.md`, go straight to step 3.
 2. Create the `STOP` file in that folder and wait until `recording.lock` disappears (a few seconds). Report the duration if visible.
-3. **Pick the language.** Use the interview's language: the application's CV front matter (`lang:`), the posting, or what the user said; if unsure, ask. Passing `--lang` matters: auto-detection assumes one language per track and garbles the rest.
+3. **Pick the language.** Pass `--lang` only if the user said which language the interview was in. Otherwise omit it and let `transcribe.py` detect it. Do not infer it from the CV or the posting: the user often doesn't know beforehand, and it often differs (e.g. a Spanish consultancy interviewing in Spanish for an English-speaking client). When the run finishes, tell the user the detected language. If it is wrong, or the interview switched languages, re-run with `--lang` set to the main language (keep the audio until the transcript looks right, then delete it).
 4. **Make sure no call is running.** Transcribing is heavy (GPU, several CPU cores, a few GB of RAM for an hour of audio) and can make a video call stutter on a modest machine. Never transcribe while any `recording.lock` exists. Ask in one line whether the call is over and nothing else is about to start; if the user has another call soon, leave the audio in place and transcribe later (`/interview stop` again, or "transcribe the pending interview").
 5. **Transcribe in the background** (it takes minutes for a long interview; the first run also downloads the model). It runs below normal priority, but heavy work may still feel slower meanwhile:
 
    ```
-   uv run transcribe.py "<folder>" --lang <code> --delete-audio
+   uv run transcribe.py "<folder>" [--lang <code>] --delete-audio
    ```
 
-   Drop `--delete-audio` only if the user asked to keep the audio. Tell the user it is running; continue with the review when it finishes.
+   Drop `--delete-audio` if the user asked to keep the audio, or if the language was detected and the user may want a re-run; delete the FLAC files once the transcript is confirmed. Tell the user it is running; continue with the review when it finishes.
 6. Run **/interview review** on the new transcript.
 
 ## /interview review [transcript]
@@ -94,6 +94,8 @@ Without an argument, use the most recent `transcript.md` without a `review.md` n
 ## Troubleshooting
 
 - **THEM track is silent:** the call audio is playing on a device other than the Windows default output. Set the headphones as the default output device before starting, and do not switch devices mid-call.
+- **ME track faint, echoey or empty:** the recorder used a different microphone than the call (it defaults to the Windows default input). A webcam or laptop mic in the same room still picks you up, just with lower quality. Next time pass `--mic` with the microphone the call uses.
+- **Transcript partly translated or garbled** (e.g. Spanish speech written as English): wrong language. Re-run `transcribe.py` with the right `--lang` (needs the audio, so delete it only after checking).
 - **Echo or interviewers' voices in the ME track:** no headphones. The review still works; mention it if it confuses who said what.
 - **`CUDA unavailable … falling back to CPU`:** transcription still works, just slower. On CPU, `--model medium` or `--model small` is faster at some cost in accuracy.
 - **Recording left running** (e.g. the session closed): `/interview stop` finds it through `recording.lock`. If the recorder process died, the FLAC files written so far are still valid; delete the stale `recording.lock` and transcribe.
