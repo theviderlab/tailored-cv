@@ -1,5 +1,9 @@
 # tailored-cv
 
+**English** · [Español](README.es.md)
+
+[![Build](https://github.com/theviderlab/tailored-cv/actions/workflows/build.yml/badge.svg)](https://github.com/theviderlab/tailored-cv/actions/workflows/build.yml)
+[![Release](https://img.shields.io/github/v/release/theviderlab/tailored-cv)](https://github.com/theviderlab/tailored-cv/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Node 18+](https://img.shields.io/badge/node-%3E%3D18-339933?logo=node.js&logoColor=white)](https://nodejs.org)
 [![Claude Code](https://img.shields.io/badge/built%20for-Claude%20Code-D97757)](https://docs.claude.com/en/docs/claude-code)
@@ -11,13 +15,14 @@ Paste a job posting link. The agent reads it, matches it against your profession
 
 ![A job posting next to the CV tailored to it, with the generated PDFs and a summary of requirements matched against the profile](docs/images/cover.png)
 
-**[Project website](https://viderlab.com/en/projects/tailored-cv/)** · [Getting started](#getting-started) · [Discussions](https://github.com/theviderlab/tailored-cv/discussions)
+**[Project website](https://viderlab.com/en/projects/tailored-cv/)** · [Getting started](#getting-started) · [See a demo](examples/alex-morgan/) · [Discussions](https://github.com/theviderlab/tailored-cv/discussions)
 
 ## Contents
 
 - [Why tailored-cv](#why-tailored-cv)
 - [Features](#features)
 - [Getting started](#getting-started)
+- [Demo](#demo)
 - [Tailoring a CV](#tailoring-a-cv)
 - [Interview debriefs](#interview-debriefs-optional-windows)
 - [Your workspace](#your-workspace)
@@ -53,13 +58,14 @@ Repository layout:
 cv/                    Markdown → PDF build (Node + headless Chrome/Edge)
 docs/                  ATS guidelines the skills apply
 tools/                 Local interview recorder and transcriber (Python)
+examples/              Fictional demo workspace (Alex Morgan)
 workspace.example/     Empty template for your personal workspace
 workspace/             Your data (git-ignored; created on first use)
 ```
 
 ## Getting started
 
-**Requirements:** [Node.js](https://nodejs.org) 18+, Google Chrome or Microsoft Edge, and an AI coding agent: [Claude Code](https://docs.claude.com/en/docs/claude-code) or [OpenCode](https://opencode.ai).
+**Requirements:** [Node.js](https://nodejs.org) 18+, Google Chrome or Microsoft Edge, and an AI coding agent: [Claude Code](https://docs.claude.com/en/docs/claude-code) or [OpenCode](https://opencode.ai). The build finds Chrome or Edge on its own on Windows; on macOS or Linux, set `CHROME_PATH` to the browser's executable.
 
 ```sh
 git clone https://github.com/theviderlab/tailored-cv.git
@@ -74,6 +80,10 @@ Open the project folder in your agent and start with one of these:
 - *"Tailor my CV to this posting: &lt;link&gt;"*. If `workspace/` does not exist yet, the skill creates it from the template and guides you.
 
 **Claude Code** picks up the skills from `.claude/skills/` and lets you call them directly (`/cv-tailor`, `/profile-audit`, `/interview`). **OpenCode** loads the same skills, so ask in plain language (*"tailor my CV to…"*) and it will use the right one.
+
+## Demo
+
+[`examples/alex-morgan/`](examples/alex-morgan/) is a complete, fictional workspace: a profile, a job posting, and the CV and cover letter tailored to it, as markdown and PDF. It is the same application shown in the screenshots. Read it to see what the tool produces, or copy it to `workspace/` to try the skills before entering your own data.
 
 ## Tailoring a CV
 
@@ -130,9 +140,9 @@ Before the next interview:
 /interview prep acme technical
 ```
 
-The agent matches the posting against the bank, estimates which questions are most likely for that role and stage, adds likely questions you have not been asked yet, and writes a prep sheet that puts the questions you answer worst first.
+The agent matches the posting against the bank, estimates which questions are most likely for that role and stage, adds likely questions you have not been asked yet, and writes a prep sheet that puts the questions you answer worst first. A transcript or review pasted from elsewhere (e.g. Teams' transcription) feeds the bank too, so this works without the recorder.
 
-![An interview prep sheet: likely themes, questions to rehearse sorted by how badly they were answered, and the best answer so far for one of them](docs/images/prep.png) A transcript or review pasted from elsewhere (e.g. Teams' transcription) feeds the bank too, so this works without the recorder.
+![An interview prep sheet: likely themes, questions to rehearse sorted by how badly they were answered, and the best answer so far for one of them](docs/images/prep.png)
 
 ## Your workspace
 
@@ -221,7 +231,7 @@ PDF section headings come from [cv/i18n.json](cv/i18n.json), where more language
 
 ## Contributing
 
-Issues, ideas and pull requests are welcome. For questions and ideas, use [Discussions](https://github.com/theviderlab/tailored-cv/discussions). Before committing, enable the pre-commit hook (see [Privacy](#privacy)) so personal data never ends up in a PR.
+Issues, ideas and pull requests are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md) for setup, testing and how to add a language. For questions and ideas, use [Discussions](https://github.com/theviderlab/tailored-cv/discussions). To report a security or privacy issue, follow [SECURITY.md](SECURITY.md). Changes are listed in [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions and ideas
+    url: https://github.com/theviderlab/tailored-cv/discussions
+    about: Ask how to use tailored-cv or share an idea before opening an issue.
+  - name: Security issue
+    url: https://github.com/theviderlab/tailored-cv/security/advisories/new
+    about: Report a vulnerability privately. Please do not open a public issue.

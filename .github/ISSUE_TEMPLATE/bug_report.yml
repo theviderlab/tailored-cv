@@ -1,0 +1,56 @@
+name: Bug report
+description: Something does not work as the README says.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. **Do not paste personal data** (your CV, profile, contact details or interview transcripts). If the problem depends on your content, reproduce it with the demo in `examples/alex-morgan/` or with made-up text.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - PDF build (cv/)
+        - cv-tailor skill
+        - profile-audit skill
+        - interview skill / recorder
+        - Pre-commit hook
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. cd cv && npm install
+        2. npm run cv -- ../examples/alex-morgan/cv-base.md
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Output or error
+      render: text
+  - type: input
+    id: agent
+    attributes:
+      label: Agent and model
+      placeholder: Claude Code 2.x with Sonnet / OpenCode with ...
+  - type: input
+    id: env
+    attributes:
+      label: Environment
+      placeholder: Windows 11, Node 22, Chrome 140
+    validations:
+      required: true

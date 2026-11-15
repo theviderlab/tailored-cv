@@ -1,0 +1,13 @@
+# Normalize text files to LF in the repo; checkouts follow each platform.
+* text=auto
+
+# Shell scripts must keep LF on every platform, or they fail on macOS/Linux.
+.githooks/* text eol=lf
+*.sh        text eol=lf
+
+# Binary files
+*.png  binary
+*.jpg  binary
+*.gif  binary
+*.pdf  binary
+*.woff2 binary

@@ -1,0 +1,64 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build demo PDFs (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [18, 20, 22]
+    env:
+      DEMO: examples/alex-morgan/output/fieldstone-analytics-senior-python-engineer
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+          cache-dependency-path: cv/package-lock.json
+
+      - name: Check the pre-commit hook
+        run: |
+          if grep -q $'\r' .githooks/pre-commit; then
+            echo "::error file=.githooks/pre-commit::CRLF line endings; the hook must use LF."
+            exit 1
+          fi
+          sh -n .githooks/pre-commit
+
+      - name: Prepare Chrome
+        run: |
+          # Arial-compatible metrics, so page counts match Windows and macOS.
+          sudo apt-get update -qq && sudo apt-get install -y -qq fonts-liberation
+          # Ubuntu 24.04 blocks the unprivileged user namespaces Chrome's sandbox needs.
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          echo "CHROME_PATH=$(command -v google-chrome)" >> "$GITHUB_ENV"
+
+      - name: Install dependencies
+        working-directory: cv
+        run: npm ci
+
+      - name: Build CV
+        working-directory: cv
+        run: npm run cv -- "../$DEMO/cv-fieldstone-analytics-senior-python-engineer.md"
+
+      - name: Build cover letter
+        working-directory: cv
+        run: npm run cover -- "../$DEMO/cover-letter-fieldstone-analytics-senior-python-engineer.md" "../$DEMO/cv-fieldstone-analytics-senior-python-engineer.md"
+
+      - name: Upload PDFs
+        if: matrix.node == 22
+        uses: actions/upload-artifact@v4
+        with:
+          name: demo-pdfs
+          path: ${{ env.DEMO }}/*.pdf

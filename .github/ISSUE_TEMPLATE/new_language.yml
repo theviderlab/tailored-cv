@@ -1,0 +1,27 @@
+name: New language
+description: Request (or offer) PDF headings in another language.
+labels: [i18n]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        PDF headings live in `cv/i18n.json`. Adding a language means adding a block with **all** the keys from `en`. A pull request is the fastest way; see CONTRIBUTING.md.
+  - type: input
+    id: lang
+    attributes:
+      label: Language and code
+      placeholder: Portuguese (pt)
+    validations:
+      required: true
+  - type: textarea
+    id: labels
+    attributes:
+      label: Translated labels
+      description: The `en` labels from cv/i18n.json, translated. The standard headings recruiters and ATS expect in that language work best.
+      render: json
+  - type: checkboxes
+    id: pr
+    attributes:
+      label: Contribution
+      options:
+        - label: I can open the pull request myself.
