@@ -1,0 +1,7 @@
+# Kept out of your private workspace repo too.
+
+# IMAP credentials
+.env
+
+# Downloaded mails: short-lived, full of third-party data and links with login tokens
+mail/

@@ -5,6 +5,9 @@
 .githooks/* text eol=lf
 *.sh        text eol=lf
 
+# Mail fixtures keep their exact bytes: CRLF line endings are part of the format.
+*.eml -text
+
 # Binary files
 *.png  binary
 *.jpg  binary

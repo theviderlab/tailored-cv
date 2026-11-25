@@ -1,0 +1,48 @@
+name: Tools
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mail-fetch:
+    name: mail-fetch tests (Python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Run the tests on the demo mails
+        run: python -m unittest discover -s tools/mail-fetch -v
+
+  job-filter:
+    name: job-filter tests (Python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install PyYAML
+        run: python -m pip install "pyyaml>=6"
+
+      - name: Run the tests on the demo postings
+        run: python -m unittest discover -s tools/job-filter -v

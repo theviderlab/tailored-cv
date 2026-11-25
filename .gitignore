@@ -1,6 +1,9 @@
 # Personal data: profile, CVs, applications. Versioned separately (your own private repo).
 workspace/
 
+# Credentials (IMAP for tools/mail-fetch and others). Templates are named .env.example.
+.env
+
 # Personal website (its own public repo, deployed to viderlab.com).
 site/
 
@@ -15,4 +18,6 @@ cv/design/.tmp_*.html
 tools/interview-recorder/*.flac
 tools/interview-recorder/*.wav
 tools/interview-recorder/transcript.md
-tools/interview-recorder/__pycache__/
+
+# Python
+__pycache__/

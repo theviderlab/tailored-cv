@@ -2,7 +2,9 @@
 # Blocks commits that would leak personal data into the public repo.
 #
 # 1. Nothing inside workspace/ (even if forced with `git add -f`).
-# 2. No pattern from workspace/.private-patterns (one per line, extended regex,
+# 2. No .env file anywhere (credentials); .env.example templates are allowed.
+# 3. No mail/ folder anywhere (downloaded mails: third-party data and login tokens).
+# 4. No pattern from workspace/.private-patterns (one per line, extended regex,
 #    case-insensitive; blank lines and lines starting with # are ignored) in added lines.
 #
 # Enable once per clone: git config core.hooksPath .githooks
@@ -10,6 +12,23 @@
 if git diff --cached --name-only | grep -q '^workspace/'; then
   echo "pre-commit: the commit includes files from workspace/. They are personal data; unstage them with:" >&2
   echo "  git restore --staged workspace/" >&2
+  exit 1
+fi
+
+# Added, copied, modified or renamed files only: deleting one of these must stay possible.
+staged=$(git diff --cached --name-only --diff-filter=ACMR)
+
+envs=$(printf '%s\n' "$staged" | grep -E '(^|/)\.env(\.[^/]+)?$' | grep -vE '(^|/)\.env\.example$')
+if [ -n "$envs" ]; then
+  echo "pre-commit: the commit includes .env files (credentials). Unstage them with git restore --staged:" >&2
+  printf '%s\n' "$envs" | sed 's/^/  /' >&2
+  exit 1
+fi
+
+mails=$(printf '%s\n' "$staged" | grep -E '(^|/)mail/')
+if [ -n "$mails" ]; then
+  echo "pre-commit: the commit includes files from a mail/ folder (downloaded mails). Unstage them with git restore --staged:" >&2
+  printf '%s\n' "$mails" | head -20 | sed 's/^/  /' >&2
   exit 1
 fi
 

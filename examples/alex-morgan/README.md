@@ -13,6 +13,8 @@ It is a snapshot taken right after Alex tailored a CV to one posting: the profil
 | [`cv-base.md`](cv-base.md), [`cover-letter-base.md`](cover-letter-base.md) | The default CV and cover letter every application starts from. |
 | [`output/fieldstone-analytics-senior-python-engineer/`](output/fieldstone-analytics-senior-python-engineer/) | The tailored CV and cover letter, as markdown and as the PDFs the build generates. |
 | [`applications.md`](applications.md) | The application log. Only the Fieldstone output folder is included in this demo. |
+| [`jobs/criteria.md`](jobs/criteria.md) | What Alex is looking for and the filter rules for job alerts (`job-inbox`). |
+| [`eml/`](eml/) | Mails for the `job-inbox` demo: job alerts, recruiter messages, application updates, irrelevant mail and a suspicious one. |
 
 Compare `cv-base.md` with the tailored CV to see what the agent changed: the headline, the summary, the skills (Kubernetes and event-driven pipelines added) and the order and wording of the Larkspur bullets. Every new fact traces back to a profile entry.
 
