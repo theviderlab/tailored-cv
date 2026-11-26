@@ -3,7 +3,8 @@
     "allow": [
       "WebFetch(domain:www.linkedin.com)",
       "WebFetch(domain:es.linkedin.com)",
-      "PowerShell(uv run tools/mail-fetch/mail_fetch.py)"
+      "PowerShell(uv run tools/mail-fetch/mail_fetch.py)",
+      "PowerShell(uv run tools/job-filter/job_filter.py --report)"
     ]
   }
 }

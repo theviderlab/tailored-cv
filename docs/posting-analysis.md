@@ -65,7 +65,7 @@ Read all of `workspace/profile/` once (in a batch, once per run, not once per po
 Written in the user's language. One block per posting, the same one that goes in the inbox:
 
 ```markdown
-### <n>. <Role> — <Company>                                  **<Recommendation>**
+### #<n> <Role> — <Company>                                  **<Recommendation>**
 
 <portal> <job_id> · <work mode (country/city)> · <salary> · <applicants> · <posted> · [link](<url>)
 
@@ -121,3 +121,5 @@ In `workspace/jobs/postings/<key>.md`, above `## Posting` (keep the posting's te
 When `workspace/jobs/postings/<key>.md` (or the application's `job-posting.md`) already has a `## Requirements` table, start from it instead of redoing sections 2 and 3: check it against the current profile (it may have grown since) and go on to the questions. Otherwise, do sections 1–3 here.
 
 Then, as `cv-tailor` describes in its step 3: use the ✅ directly; do not ask about ❌ that are in `gaps.md` (point out a core one as a gap); ask about the 🟡 with `level: ?` / `evidence: ?` and the requirements that are not recorded anywhere, when they matter for this posting.
+
+When the application folder is created, the posting ends up there as `job-posting.md`: moved from `workspace/jobs/postings/` (with its new `posting_path` recorded in `seen.json`), or written by `cv-tailor` when it did not come from `job-inbox` (its step 6). That is where `/interview prep` reads it.

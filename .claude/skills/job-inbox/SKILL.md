@@ -1,6 +1,6 @@
 ---
 name: job-inbox
-description: Manages a mailbox dedicated to the job search - downloads new mail (IMAP or imported .eml files), sorts each mail into job alert, recruiter message, application update or irrelevant, extracts the postings of job alerts, filters them against the user's search criteria, reads the ones that get through in full and judges them against the profile (a card with a recommendation), and keeps a local inbox of what needs attention. Use when the user asks to check, read, sort or triage their job mail or inbox, says they forwarded offers or alerts to their job mailbox, wants to set up the job mailbox or their job search criteria and filters, asks why a posting was filtered out, asks to analyse a posting ("analyse posting 3", a pasted posting or a link) or pastes the text of a pending one, or runs /job-inbox or /job-inbox triage.
+description: Manages a mailbox dedicated to the job search - downloads new mail (IMAP or imported .eml files), sorts each mail into job alert, recruiter message, application update or irrelevant, extracts the postings of job alerts, filters them against the user's search criteria, reads the ones that get through in full and judges them against the profile (a card with a recommendation), and keeps a local inbox of what needs attention, where the user decides on each posting (apply, which hands over to cv-tailor, discard or later). Use when the user asks to check, read, sort or triage their job mail or inbox, says they forwarded offers or alerts to their job mailbox, wants to set up the job mailbox or their job search criteria and filters, asks why a posting was filtered out, asks to analyse a posting ("analyse posting 3", a pasted posting or a link) or pastes the text of a pending one, decides on postings of the inbox ("apply to 23 and 7", "discard 12", "later"), or runs /job-inbox or /job-inbox triage.
 ---
 
 # Job inbox
@@ -21,7 +21,8 @@ Talk to the user in their own language.
 
 | The user says… | Do |
 |---|---|
-| `/job-inbox`, "check my job mail" | First-run checks → fetch → triage → process alerts → stage 2 on the queue → rebuild `jobs/inbox.md` → summary. Messages and updates are processed in later stages; for now they wait as `classified`. |
+| `/job-inbox`, "check my job mail" | First-run checks → `job-filter --release-later` → fetch → triage → process alerts → stage 2 on the queue → rebuild `jobs/inbox.md` → summary. Messages and updates are processed in later stages; for now they wait as `classified`. |
+| "Apply to 1 and 3", "discard 2: it's on-site", "4 later" | See "Decisions". |
 | `/job-inbox triage`, "what's in my inbox" | Triage the mails already in `workspace/mail/inbox/` (no fetching, no processing) and summarize. |
 | "Import these mails", a folder or `.eml` files | `mail-fetch --import <paths>`, then the same as `/job-inbox` from triage on. |
 | "Mail X is a recruiter message", "the unknown one is an alert" | Reclassify (see "Answers from the user"). |
@@ -52,7 +53,11 @@ uv run tools/job-filter/job_filter.py --report               # open postings and
 uv run tools/job-filter/job_filter.py --explain <key>        # how each rule judges a recorded posting
 uv run tools/job-filter/job_filter.py workspace/jobs/extracted/recheck-<key>.json --recheck --update-seen   # stage 2, second pass
 uv run tools/job-filter/job_filter.py --set <key> stage=analysed recommendation=apply ...   # record stage 2 results
+uv run tools/job-filter/job_filter.py --set '#<n>' user_decision=discard "user_reason=..."  # the user's decision
+uv run tools/job-filter/job_filter.py --release-later        # "later" postings are to decide again
 ```
+
+Every posting has a permanent number `n` (in `seen.json`, in every `--report` item and in the inbox): `#<n>` works wherever a key does.
 
 **You never decide stage 1 yourself**, and you never edit `jobs/seen.json` by hand: the script writes it, also the stage 2 results (`--set`, fields in its README). Exit code 2 is an error in the criteria, the extracted files or a `--set` value: fix what it names and run it again.
 
@@ -233,12 +238,13 @@ When the user pastes a posting or gives a link outside the mailbox:
 
 `workspace/jobs/inbox.md` is rebuilt **from scratch** at the end of every run that processed something (never edited in place, never edited by hand), from `job-filter --report` and the mails in `workspace/mail/inbox/`. Write it in the user's language; the keys from the tools (`pass`, `maybe`, `title_exclude`…) may stay as they are, inside backticks.
 
-Sections, in this order; leave out a section that would be empty. Number the postings once across the whole file, in this order (the user will refer to them by number: "apply 1 and 3", "discard 2"):
+Sections, in this order; leave out a section that would be empty. Every posting is shown with **its own number `n`** from the report, in every section (the user refers to them by number: "apply 23 and 7", "discard 12"). Never renumber them: the numbers are permanent, so within a section they are not consecutive, and rebuilding the file between decisions is harmless.
 
-1. **To decide** — the `to_decide` postings of the report, in its order: the `## Card` section of each `posting_path`, copied as it is, with its number. Never redo an analysis to rebuild the file. A posting with `same_as` is not a card of its own: add "also published as [link](…)" to the card it points to.
-2. **To analyse** — the `open` postings of the report (the stage 2 queue), in its order. One line each: number, title, company, location, published salary or `salary_text`, the filter decision with what was missing (`maybe`: no seniority) or the repost (and the earlier posting or application it repeats), and the link.
-3. **Pending** — the `pending_text` postings (one line each, numbered: "paste the text to analyse it", with the link if there is one); mails with `status: "unknown"` (sender and subject, asking what they are); messages and updates waiting to be processed, one line each.
-4. **Filtered** (last 7 days) — inside `<details><summary>…</summary>`: the `filtered` postings of the report, one line each with title, company, `rule_id` and reason.
+1. **To apply** — the `to_apply` postings of the report: the user decided to apply and `cv-tailor` has not made the application yet. One line each: number, role, company, the recommendation, the date of the decision and its reason if any, and "say «apply <n>» to start `cv-tailor`".
+2. **To decide** — the `to_decide` postings of the report, in its order: the `## Card` section of each `posting_path`, copied as it is, with its number. Never redo an analysis to rebuild the file. A posting with `same_as` is not a card of its own: add "also published as #<n> [link](…)" to the card it points to.
+3. **To analyse** — the `open` postings of the report (the stage 2 queue), in its order. One line each: number, title, company, location, published salary or `salary_text`, the filter decision with what was missing (`maybe`: no seniority) or the repost (and the earlier posting or application it repeats), and the link.
+4. **Pending** — the `pending_text` postings (one line each, with its number: "paste the text to analyse it", with the link if there is one); mails with `status: "unknown"` (sender and subject, asking what they are); messages and updates waiting to be processed, one line each.
+5. **Filtered** (last 7 days) — inside `<details><summary>…</summary>`: the `filtered` postings of the report, one line each with number, title, company, `rule_id` and reason.
 
 Start the file with a one-line header: the date it was generated and that it is rebuilt on every run.
 
@@ -247,9 +253,13 @@ Start the file with a one-line header: the date it was generated and that it is 
 
 Generated on 2026-11-26 by job-inbox. Rebuilt on every run: do not edit.
 
+## To apply (1)
+
+- **#9** Backend Engineer, Payments · Lumen Pay · Apply · decided on 2026-11-25 · say «apply 9» to start `cv-tailor`
+
 ## To decide (1)
 
-### 1. Senior Software Engineer, Data Infrastructure — Northwind Grid                **Apply**
+### #4 Senior Software Engineer, Data Infrastructure — Northwind Grid                **Apply**
 
 LinkedIn 9900000110 · Remote (EMEA) · €80K–95K · 42 applicants · 3 days ago · [link](https://www.linkedin.com/jobs/view/9900000110/)
 
@@ -258,22 +268,44 @@ LinkedIn 9900000110 · Remote (EMEA) · €80K–95K · 42 applicants · 3 days 
 
 ## To analyse (2)
 
-2. **Staff Data Engineer** · Tessera Health · Portugal (Remote) · `repost`: applied on 2026-11-10 to Senior Data Platform Engineer (sent) · [link](…)
-3. **Python Engineer, Data Platform** · Kestrel Analytics · Portugal (Remote) · `maybe`: no seniority · [link](…)
+- **#11** Staff Data Engineer · Tessera Health · Portugal (Remote) · `repost`: applied on 2026-11-10 to Senior Data Platform Engineer (sent) · [link](…)
+- **#2** Python Engineer, Data Platform · Kestrel Analytics · Portugal (Remote) · `maybe`: no seniority · [link](…)
 
 ## Pending
 
-4. **AI Platform Engineer** · company not shown (Experteer) · Barcelona · no link: paste the posting's text to analyse it
+- **#7** AI Platform Engineer · company not shown (Experteer) · Barcelona · no link: paste the posting's text to analyse it
 
 ## Filtered (last 7 days)
 
 <details><summary>2 postings</summary>
 
-- Junior Python Developer · Ardent Robotics · `title_exclude`: title contains 'junior'
-- Senior Python Engineer · Veridian Ledger · `salary_floor`: 62000 EUR/year is below the remote floor of 65000 EUR
+- #5 Junior Python Developer · Ardent Robotics · `title_exclude`: title contains 'junior'
+- #6 Senior Python Engineer · Veridian Ledger · `salary_floor`: 62000 EUR/year is below the remote floor of 65000 EUR
 
 </details>
 ```
+
+## Decisions
+
+The user decides on postings in plain words, usually by number: "apply 23 and 7", "discard 12: it's on-site", "4 later", "leave 9 for later". Any posting in the inbox can be decided, not only the analysed ones: discarding one that is still queued or pending needs no analysis. The numbers are the `n` of the report (the ones in `jobs/inbox.md`); if a number is not in the report, or a name ("the Deel one") matches more than one posting, ask.
+
+| The user says | Record | Then |
+|---|---|---|
+| apply | `--set '#<n>' user_decision=apply`, plus `"user_reason=…"` if they gave one | Hand over to `cv-tailor` (below). |
+| discard | `user_decision=discard` and the reason, if given | If it goes against an **Apply** or **Apply with reservations** card and they gave no reason, ask for it in one line, saying it is optional and helps tune the criteria; record the answer with another `--set … user_reason=…`. |
+| later | `user_decision=later` | It leaves the inbox for now and is back in **To decide** at the start of the next full run (`--release-later`). |
+| changes their mind | the new decision (it replaces the old one and its reason) | `user_decision=null` makes it undecided again. |
+
+Record all the decisions of the message first, then rebuild `jobs/inbox.md`, then confirm in one line each (number, role, company, decision) and go on.
+
+- **The same job twice.** `--set` copies the decision to the other postings of the same job (`also_set` in its output); nothing else to do.
+- **Applying against a Discard.** Record it with the reason; do not redo the card. If the reason holds beyond this posting ("I'd move to Barcelona", "I apply even when they ask for AWS"), propose the change, as a diff, applied only after they confirm: for a knock-out that comes from a gap, a note under that entry of `workspace/profile/gaps.md` saying they apply anyway (`docs/posting-analysis.md` then marks it ❌, not ⛔); for a condition or a stage 1 rule, the change to `criteria.md` (see "Changing it"). A one-off exception changes nothing else.
+
+### Handing over to `cv-tailor`
+
+- One application at a time, in the order the user gave. Say which one starts (number, role, company) and how many stay in **To apply**.
+- Follow the `cv-tailor` skill for that posting: its step 2 finds the saved posting through `posting_path` and its step 3 starts from the `## Requirements` table, so it only asks about the 🟡 and ❌ that matter. A posting that was not analysed yet (To analyse, Pending) goes through `cv-tailor`'s usual steps 2 and 3; a pending one without a link needs its text pasted.
+- `cv-tailor` moves the posting into the application folder and records the new `posting_path`, which takes it out of **To apply**. Until then (the user stops, the session ends) it stays there, so nothing decided gets lost.
 
 ## Log
 
@@ -302,7 +334,7 @@ At the end of a run, show only a short summary in the chat:
 
 1. **Suspicious** mails first, if any: sender, subject, what it asks for, "not acted on".
 2. Counts: "N new mails: X alerts (Y new postings, Z got through the filter), M messages, K updates, I irrelevant (deleted)". Duplicates are counted, not listed.
-3. **To decide:** the postings analysed in this run, best first (up to 5): number, role, company, recommendation and its one-line reason; then "and N more in `jobs/inbox.md`". Then how many stay queued (`max_detailed`) and how many need their text pasted.
+3. **To decide:** the postings analysed in this run, best first (up to 5): number, role, company, recommendation and its one-line reason; then "and N more in `jobs/inbox.md`". Then how many stay queued (`max_detailed`) and how many need their text pasted. If **To apply** is not empty, one line listing those numbers ("decided to apply, not done yet: #9, #14"), and how many postings came back from "later".
 4. **Filtered:** how many, grouped by rule ("4 by location, 2 by `title_exclude`"), so the user can spot a rule that is too strict. Name any rejection that looks wrong to you and offer `--explain`.
 5. One line per message or update waiting, with the `user_note` if there is one.
 6. **To ask:** each `unknown` mail with sender and subject, asking what it is.

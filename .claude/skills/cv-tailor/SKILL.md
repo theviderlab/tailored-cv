@@ -113,7 +113,9 @@ Best regards,
 
 1. **Read the sources:** all of `workspace/profile/`, the base CV, the base cover letter and `workspace/applications.md` (to detect whether the user already applied to that company).
 
-2. **Get the job posting.** Follow section 1 of `docs/posting-analysis.md`: an analysis already saved by `job-inbox` (`workspace/jobs/postings/`), then `tools/posting-fetch` for the link the user gave, then the web fetch tool (`WebFetch` in Claude Code, `webfetch` in OpenCode), then a browser if one is available, and only as a last resort ask the user to paste the posting text.
+2. **Get the job posting.** Follow section 1 of `docs/posting-analysis.md`: an analysis already saved by `job-inbox` (`workspace/jobs/postings/`) or a `job-posting.md` already in the application's folder, then `tools/posting-fetch` for the link the user gave, then the web fetch tool (`WebFetch` in Claude Code, `webfetch` in OpenCode), then a browser if one is available, and only as a last resort ask the user to paste the posting text.
+
+   **Postings from `job-inbox`.** When the posting is in `workspace/jobs/seen.json` (the user named its inbox number, `#23`, or the link gives its key, `linkedin-<id>`), the saved file is its `posting_path`. If its `user_decision` is not `apply` yet (the user came straight here), record it: `uv run tools/job-filter/job_filter.py --set <key> user_decision=apply`.
 
 3. **Match the posting against the profile.** Extract the posting's requirements (`must` / `nice`) and conditions and mark each against the profile as described in sections 2 and 3 of `docs/posting-analysis.md` (✅ covered · 🟡 partial · ❌ gap · ⛔ knock-out, each citing its source). If the posting comes from `job-inbox` with a `## Requirements` table, start from it and check it against the current profile. Then:
    - **✅ In the profile:** can be used directly.
@@ -149,6 +151,9 @@ Best regards,
    - `workspace/output/<company>-<role>/cover-letter-<company>-<role>.md`
    - (company and role as slugs: lowercase, no spaces or accents, separated by `-`. File names keep the slug so the PDFs remain identifiable when sent.)
    - If the folder already exists (same company and role), ask the user whether to overwrite or use a suffix (e.g. `-2`).
+   - **The posting goes in the folder too**, as `workspace/output/<company>-<role>/job-posting.md` (`/interview prep` reads it there). If one is already there, ask before replacing it.
+     - From `job-inbox` (`workspace/jobs/postings/<key>.md`): **move** the file as it is (front matter, `## Card`, `## Requirements`, `## Posting`), then record the new path: `uv run tools/job-filter/job_filter.py --set <key> posting_path=output/<company>-<role>/job-posting.md`. That takes it out of the inbox's "To apply".
+     - Otherwise, write it with the layout of `docs/posting-analysis.md` ("Saving it" in section 1, "Saving the analysis" in section 4), without the card: front matter (`url`, `fetched`, `text_source`, `title`, `company`, `location`), `# <title> — <company>`, `## Requirements` (the table of step 3, with the marks the user's answers changed) and `## Posting` (the text as you got it, untouched).
 
 7. **Verify before building.** Compare the new file against the base CV and produce a short report:
    - List each substantive change (phrase, fact, number, link, name).
@@ -171,7 +176,7 @@ Best regards,
 
    Each PDF is created next to its `.md`, inside the application's subfolder. If the CV goes over 2 pages or the letter reports overflow, trim that text and rebuild. Experience blocks are not split across pages: if the first role does not fit on page 1, it jumps whole to page 2 and the CV can reach 3 pages even with space left over. In that case, shorten the summary, the skills or the first role's bullets.
 
-9. **Log the application** in `workspace/applications.md`: add a row at the top with date, company, role, folder, posting link (if any), status `sent` (or `?` if the user has not confirmed sending it) and short notes (e.g. language).
+9. **Log the application** in `workspace/applications.md`: add a row at the top with date, company, role, folder, posting link (if any; the canonical one, e.g. `https://www.linkedin.com/jobs/view/<id>/`, never a link with tracking parameters: `job-inbox` recognizes postings already applied to by it), status `sent` (or `?` if the user has not confirmed sending it) and short notes (e.g. language).
 
 10. **Suggest base CV improvements (optional).** If the log shows something was added in 3 or more recent applications (e.g. SQL or LangChain), or that a base bullet is always removed, suggest in one line that the user update the base CV. Do not edit it without their approval.
 

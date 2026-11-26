@@ -22,6 +22,8 @@ uv run job_filter.py <posting.json> --recheck --update-seen              # secon
 uv run job_filter.py --explain linkedin-4492981823                       # how each rule judges a recorded posting
 uv run job_filter.py --report [--days 7]                                 # what the inbox shows (JSON)
 uv run job_filter.py --set linkedin-4492981823 stage=analysed recommendation=apply   # record stage 2 results
+uv run job_filter.py --set '#23' user_decision=discard "user_reason=on-site"         # record your decision, by number
+uv run job_filter.py --release-later                                     # 'later' decisions are to decide again
 ```
 
 All of them take `--workspace DIR` (default: `workspace/` at the repo root), and `--criteria`, `--seen`, `--applications` to point at other files. `--date YYYY-MM-DD` sets the date recorded in `seen.json` (default: today). `uv` installs the only dependency, PyYAML, by itself.
@@ -105,11 +107,13 @@ The monthly factor defaults to 14 (Spain's 14 payments), the most lenient: a mon
 
 With `--update-seen`, each posting is recorded under its key in `workspace/jobs/seen.json`: the dates and mails it was seen in, its fields (never the posting text), and the filter decision (with `repost_of` for a repost). This is what keeps deduplication and `--explain` working after the mail has been deleted. Nobody edits the file by hand: the stage 2 results and your decisions are recorded with `--set` (below).
 
+**Numbers.** Every posting gets a permanent number `n` when it is first recorded (the highest so far + 1), which the inbox shows and you use to refer to it ("apply 23"). A number never changes and is never reused, so it means the same posting in every run. A `seen.json` from before the numbers gets them on the first run of any command, by `first_seen` and then key.
+
 `--recheck` is the second pass of stage 2: once the full posting has been read, the model corrects or completes the fields (real work mode, city, salary, contract) and the posting is judged again. The new fields are merged over the recorded ones, the posting is not treated as a duplicate of itself (nor is the file counted as a mail it was seen in), and the decision is recorded as `pass: 2`.
 
 ## `--set`
 
-`--set <key> field=value...` records the outcome of stage 2, or your decision, for a posting already in `seen.json`. Every value is checked; `null` clears a field.
+`--set <key> field=value...` records the outcome of stage 2, or your decision, for a posting already in `seen.json`. The key may also be the posting's number, `#23`. Every value is checked; `null` clears a field. The output lists in `also_set` the other postings of the same job that got the change (see `same_as`).
 
 | Field | Values |
 |---|---|
@@ -120,7 +124,11 @@ With `--update-seen`, each posting is recorded under its key in `workspace/jobs/
 | `fit` | How well the core of the role matches the search: `high` · `medium` · `low` |
 | `posting_path` | The saved posting, relative to the workspace; it must exist |
 | `same_as` | Another key in `seen.json`: the same job posted twice, which shares its analysis |
-| `user_decision`, `user_reason` | `apply` · `discard` · `later`, and why. Records `user_decision_date`. |
+| `user_decision`, `user_reason` | `apply` · `discard` · `later`, and why. Records `user_decision_date`; a new decision without a reason clears the old reason. |
+
+`user_decision`, `user_reason` and `posting_path` are shared by the postings of one job: set on a posting, they are copied to every posting whose `same_as` points to it; set on one with `same_as`, to the posting it points to and its other aliases.
+
+`--release-later` clears every `later` decision (and its reason), so those postings are back in `to_decide`. The skill runs it at the start of each full run: "later" means "not in this run".
 
 ## `--explain`
 
@@ -144,7 +152,11 @@ It reads the fields from `seen.json` and judges them with the current criteria, 
 
 What the skill needs to rebuild `workspace/jobs/inbox.md`, read from `seen.json` alone (so it keeps working after the mails are deleted), as JSON:
 
-Postings you have decided on and expired ones are left out.
+Every item carries its number `n`.
+
+- `to_apply`: postings you decided to apply to that `cv-tailor` has not moved into an application folder yet (`posting_path` not under `output/`), oldest decision first. Aliases (`same_as`) are left out.
+
+The other lists leave out the postings you have decided on and the expired ones:
 
 - `to_decide`: postings analysed in stage 2, by recommendation (`apply`, `apply_with_reservations`, `discard`), then fewest knock-outs, highest share of must-haves covered and best fit. A posting the second pass rejected stays here as a `discard`, citing the rule, so you can disagree.
 - `open`: the stage 2 queue, postings that got through stage 1 (`pass`, `repost`, `maybe`) and are not analysed yet: `pass`, then `repost`, then `maybe`; within each, newest first, then fewest applicants, then fewest missing fields.
@@ -159,4 +171,4 @@ python -m pip install pyyaml   # once
 python -m unittest discover -s tools/job-filter -v
 ```
 
-They filter the demo postings in [`examples/alex-morgan/jobs/extracted/`](../../examples/alex-morgan/jobs/extracted/) against Alex's criteria and application log, checking the outcomes listed in [`examples/alex-morgan/eml/README.md`](../../examples/alex-morgan/eml/README.md), and cover each rule, yearly conversion, regions, invalid values, `duplicate` vs `repost`, the second pass and `--explain` after the mail is gone. They run in CI.
+They filter the demo postings in [`examples/alex-morgan/jobs/extracted/`](../../examples/alex-morgan/jobs/extracted/) against Alex's criteria and application log, checking the outcomes listed in [`examples/alex-morgan/eml/README.md`](../../examples/alex-morgan/eml/README.md), and cover each rule, yearly conversion, regions, invalid values, `duplicate` vs `repost`, the second pass, `--explain` after the mail is gone, the report, permanent numbers and your decisions (`same_as`, `to_apply`, `--release-later`). They run in CI.

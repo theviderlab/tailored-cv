@@ -11,7 +11,8 @@ Usage:
                                                              second pass with the full posting (stage 2)
     uv run job_filter.py --explain <key>                     show how each rule judges a recorded posting
     uv run job_filter.py --report [--days 7]                 open postings and recent rejections, for the inbox
-    uv run job_filter.py --set <key> field=value...          record stage 2 results or the user's decision
+    uv run job_filter.py --set <key|#n> field=value...       record stage 2 results or the user's decision
+    uv run job_filter.py --release-later                     'later' decisions back to undecided (start of a run)
     (all of them take --workspace DIR, --criteria, --seen, --applications and --date YYYY-MM-DD)
 
 The model extracts and normalizes the postings of each job alert into
@@ -398,6 +399,32 @@ def save_seen(path, seen):
     os.replace(tmp, path)
 
 
+def assign_numbers(seen):
+    """Give every posting without one its permanent number `n` (highest + 1), by first_seen and then
+    in the order the postings were added (key order for the ones read from disk). The user refers to
+    postings by these numbers ("apply 23"), so a number never changes or gets reused.
+    Returns how many were assigned."""
+    postings = seen["postings"]
+    used = [e["n"] for e in postings.values() if isinstance(e.get("n"), int)]
+    next_n = max(used, default=0) + 1
+    order = {k: i for i, k in enumerate(postings)}
+    todo = sorted((k for k, e in postings.items() if not isinstance(e.get("n"), int)),
+                  key=lambda k: (postings[k].get("first_seen") or "", order[k]))
+    for k in todo:
+        postings[k]["n"] = next_n
+        next_n += 1
+    return len(todo)
+
+
+def find_key(ref, postings):
+    """A posting's key from its key (any case) or its number (`#23`). None if there is no such posting."""
+    ref = ref.strip()
+    if re.fullmatch(r"#\d+", ref):
+        n = int(ref[1:])
+        return next((k for k, e in postings.items() if e.get("n") == n), None)
+    return next((k for k in postings if k.lower() == ref.lower()), None)
+
+
 def _add_unique(entry, field, value):
     if value and value not in entry.setdefault(field, []):
         entry[field].append(value)
@@ -623,6 +650,10 @@ def filter_postings(batches, criteria, seen, applications, today, recheck=False)
             if not stored:  # a second pass reads the full posting, not a mail
                 _add_unique(entry, "seen", today)
                 _add_unique(entry, "mail_ids", mail_id)
+    assign_numbers(seen)
+    for r in results:
+        entry = postings.get(r["key"]) or postings.get(r.get("duplicate_of") or "")
+        r["n"] = entry.get("n") if entry else None
     return results
 
 
@@ -639,14 +670,15 @@ def _new_entry(p, today):
 def explain(key, criteria, seen):
     """Human-readable account of how each rule judges a recorded posting, with the current criteria."""
     postings = seen["postings"]
-    match = next((k for k in postings if k.lower() == key.lower()), None)
+    match = find_key(key, postings)
     if match is None:
         close = [k for k in postings if key.lower() in k.lower()]
         hint = f" Did you mean: {', '.join(close[:5])}?" if close else ""
         raise ConfigError(f"'{key}' is not in seen.json.{hint}")
     entry = postings[match]
     p, invalid = validate({f: entry.get(f) for f in FIELDS}, criteria)
-    lines = [f"{match} · {p['title'] or '?'} · {p['company'] or '?'}"]
+    number = f"#{entry['n']} " if isinstance(entry.get("n"), int) else ""
+    lines = [f"{number}{match} · {p['title'] or '?'} · {p['company'] or '?'}"]
     seen_on = ", ".join(entry.get("seen") or []) or "?"
     lines.append(f"Seen: {seen_on} (mails: {', '.join(entry.get('mail_ids') or []) or '?'})")
     f = entry.get("filter") or {}
@@ -693,15 +725,29 @@ FITS = ["high", "medium", "low"]
 SETTABLE = ["stage", "recommendation", "knockouts", "must_covered", "fit", "posting_path", "same_as",
             "user_decision", "user_reason"]
 NULLS = {"", "null", "none"}
+# Shared by the postings of one job published twice (same_as): set on one, copied to the others.
+SHARED = ["user_decision", "user_reason", "user_decision_date", "posting_path"]
+
+
+def same_job(key, postings):
+    """The keys of the postings that are the same job as `key`: the one the same_as links point to,
+    and every posting whose same_as points to it. Just [key] when there are no links."""
+    root = postings[key].get("same_as") or key
+    if root not in postings:
+        root = key
+    return [root] + sorted(k for k, e in postings.items() if k != root and e.get("same_as") == root)
 
 
 def set_fields(key, assignments, seen, workspace, today):
     """Record stage 2 results (or the user's decision) for a posting: `field=value` strings, validated.
+    The key may also be the posting's number (`#23`). The fields in SHARED are copied to the other
+    postings of the same job (same_as).
 
-    Returns the updated entry. Raises ConfigError on an unknown posting, field or value.
+    Returns (key, updated entry, keys of the other postings it was copied to).
+    Raises ConfigError on an unknown posting, field or value.
     """
     postings = seen["postings"]
-    match = next((k for k in postings if k.lower() == key.lower()), None)
+    match = find_key(key, postings)
     if match is None:
         raise ConfigError(f"'{key}' is not in seen.json")
     entry = postings[match]
@@ -756,8 +802,22 @@ def set_fields(key, assignments, seen, workspace, today):
         changes["stage_date"] = today
     if "user_decision" in changes:
         changes["user_decision_date"] = today if changes["user_decision"] else None
+        changes.setdefault("user_reason", None)  # a new decision does not keep the old one's reason
     entry.update(changes)
-    return match, entry
+    shared = {f: v for f, v in changes.items() if f in SHARED}
+    others = [k for k in same_job(match, postings) if k != match] if shared else []
+    for k in others:
+        postings[k].update(shared)
+    return match, entry, others
+
+
+def release_later(seen):
+    """Clear every `later` decision, so those postings come back to be decided (start of a full run).
+    Returns the keys released."""
+    released = [k for k, e in seen["postings"].items() if e.get("user_decision") == "later"]
+    for k in released:
+        seen["postings"][k].update(user_decision=None, user_decision_date=None, user_reason=None)
+    return released
 
 
 # ---------------------------------------------------------------- report
@@ -798,7 +858,11 @@ def _decide_order(e):
 def report(seen, today, days=7):
     """What the job-inbox tray shows, from seen.json alone (so it works after the mails are gone).
 
-    Only postings without a decision from the user and not expired:
+    Every item carries the posting's permanent number `n`.
+    to_apply: the user decided to apply and cv-tailor has not moved the posting into an application
+    folder yet (posting_path not under output/); oldest decision first. Postings with same_as are
+    left out (their decision is the one of the posting they point to).
+    The rest, only postings without a decision from the user and not expired:
     to_decide: analysed in stage 2, in the order of _decide_order (also those a second pass rejected:
     they show as "discard", citing the rule).
     open: the stage 2 queue, postings that got through stage 1 (pass, repost, maybe) and are not analysed
@@ -807,11 +871,11 @@ def report(seen, today, days=7):
     filtered: postings rejected by stage 1 in the last `days` days, newest first.
     """
     since = date.fromordinal(_ordinal(today) - days).isoformat()
-    to_decide, open_, pending, filtered = [], [], [], []
+    to_apply, to_decide, open_, pending, filtered = [], [], [], [], []
     for key, entry in seen["postings"].items():
         f = entry.get("filter") or {}
         stage = entry.get("stage")
-        item = {"key": key, **{field: entry.get(field) for field in REPORT_FIELDS},
+        item = {"n": entry.get("n"), "key": key, **{field: entry.get(field) for field in REPORT_FIELDS},
                 "first_seen": entry.get("first_seen"), "seen": entry.get("seen") or [],
                 "mail_ids": entry.get("mail_ids") or [], "stage": stage,
                 "decision": f.get("decision"), "rule_id": f.get("rule_id"), "reason": f.get("reason"),
@@ -821,7 +885,11 @@ def report(seen, today, days=7):
                   "knockouts": entry.get("knockouts"), "must_covered": entry.get("must_covered"),
                   "fit": entry.get("fit"), "posting_path": entry.get("posting_path"),
                   "same_as": entry.get("same_as"), "stage_date": entry.get("stage_date")}
-        if undecided and stage == "analysed" and f.get("decision") != "duplicate":
+        if entry.get("user_decision") == "apply":
+            if not entry.get("same_as") and not (entry.get("posting_path") or "").startswith("output/"):
+                to_apply.append({**item, **stage2, "user_reason": entry.get("user_reason"),
+                                 "user_decision_date": entry.get("user_decision_date")})
+        elif undecided and stage == "analysed" and f.get("decision") != "duplicate":
             to_decide.append({**item, **stage2})
         elif undecided and f.get("decision") in OPEN_DECISIONS and stage == "pending_text":
             pending.append({**item, **stage2})
@@ -831,6 +899,7 @@ def report(seen, today, days=7):
                 and (f.get("date") or "") >= since:
             item["user_decision"] = entry.get("user_decision")
             filtered.append(item)
+    to_apply.sort(key=lambda e: (e["user_decision_date"] or "", e["n"] or 0, e["key"]))
     to_decide.sort(key=_decide_order)
     queue_order = lambda e: (OPEN_DECISIONS.index(e["decision"]), -_ordinal(e["first_seen"]),  # noqa: E731
                              _applicant_count(seen["postings"][e["key"]]), len(e["missing"]), e["key"])
@@ -839,10 +908,11 @@ def report(seen, today, days=7):
     filtered.sort(key=lambda e: (-_ordinal(e["filter_date"]), e["key"]))
     counts = {d: sum(e["decision"] == d for e in open_) for d in OPEN_DECISIONS}
     counts["reject"] = len(filtered)
+    counts["to_apply"] = len(to_apply)
     counts["to_decide"] = len(to_decide)
     counts["pending_text"] = len(pending)
-    return {"date": today, "days": days, "to_decide": to_decide, "open": open_, "pending_text": pending,
-            "filtered": filtered, "counts": counts}
+    return {"date": today, "days": days, "to_apply": to_apply, "to_decide": to_decide, "open": open_,
+            "pending_text": pending, "filtered": filtered, "counts": counts}
 
 
 # ---------------------------------------------------------------- CLI
@@ -871,7 +941,9 @@ def main(argv=None):
                         help="print what the inbox shows: open postings and recent rejections, from seen.json")
     parser.add_argument("--set", nargs="+", metavar=("KEY", "FIELD=VALUE"), dest="set_fields",
                         help="record stage 2 results or the user's decision for a posting in seen.json: "
-                             + ", ".join(SETTABLE) + " (value null clears a field)")
+                             + ", ".join(SETTABLE) + " (value null clears a field); KEY may be the number, #23")
+    parser.add_argument("--release-later", action="store_true",
+                        help="clear every 'later' decision, so those postings are to decide again (start of a run)")
     parser.add_argument("--days", type=int, default=7, help="--report: rejections of the last N days (default 7)")
     parser.add_argument("--update-seen", action="store_true", help="record the results in seen.json")
     parser.add_argument("--recheck", action="store_true",
@@ -890,8 +962,10 @@ def main(argv=None):
     applications_path = args.applications or args.workspace / "applications.md"
     if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", args.date) or not _ordinal(args.date):
         parser.error("--date must be YYYY-MM-DD")
-    if sum((bool(args.explain), bool(args.report), bool(args.extracted), bool(args.set_fields))) != 1:
-        parser.error("give extracted .json files, --explain KEY, --report or --set KEY FIELD=VALUE...")
+    if sum((bool(args.explain), bool(args.report), bool(args.extracted), bool(args.set_fields),
+            args.release_later)) != 1:
+        parser.error("give extracted .json files, --explain KEY, --report, --set KEY FIELD=VALUE... "
+                     "or --release-later")
     if args.set_fields and len(args.set_fields) < 2:
         parser.error("--set needs a posting key and at least one FIELD=VALUE")
     if args.days < 0:
@@ -901,17 +975,26 @@ def main(argv=None):
             raise ConfigError(f"{criteria_path} not found; the job-inbox skill creates it on the first run")
         criteria = load_criteria(criteria_path)
         seen = load_seen(seen_path)
+        if assign_numbers(seen):  # seen.json files from before the numbers, once
+            save_seen(seen_path, seen)
         if args.explain:
             print(explain(args.explain, criteria, seen))
             return 0
         if args.report:
             print(json.dumps(report(seen, args.date, args.days), ensure_ascii=False, indent=2))
             return 0
+        if args.release_later:
+            released = release_later(seen)
+            save_seen(seen_path, seen)
+            print(json.dumps({"released": released}, ensure_ascii=False, indent=2))
+            return 0
         if args.set_fields:
-            key, entry = set_fields(args.set_fields[0], args.set_fields[1:], seen, args.workspace, args.date)
+            key, entry, others = set_fields(args.set_fields[0], args.set_fields[1:], seen, args.workspace,
+                                            args.date)
             save_seen(seen_path, seen)
             shown = ["stage", "stage_date"] + SETTABLE[1:] + ["user_decision_date"]
-            print(json.dumps({"key": key, **{f: entry.get(f) for f in shown}}, ensure_ascii=False, indent=2))
+            print(json.dumps({"n": entry.get("n"), "key": key, **{f: entry.get(f) for f in shown},
+                              "also_set": others}, ensure_ascii=False, indent=2))
             return 0
         batches = read_batches(args.extracted)
         results = filter_postings(batches, criteria, seen, read_applications(applications_path), args.date,

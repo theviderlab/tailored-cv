@@ -104,7 +104,7 @@ Without an argument, use the most recent `transcript.md` without a `review.md` n
 
 Prepares the next interview of an application from the question bank. It reads the bank but never changes it: only real interviews (`/interview review`) do.
 
-1. **Read the context:** the application folder (job description or posting, tailored CV, company research, interviewer profiles, earlier reviews of this application), its row in `workspace/applications.md`, `workspace/profile/` and `workspace/interview-bank/index.md`. Ask for the stage only if it is not obvious (screening, technical, manager, executive…). If the posting text is missing, ask for it.
+1. **Read the context:** the application folder (the posting in `job-posting.md`, or `job-description.md` in older folders; tailored CV, company research, interviewer profiles, earlier reviews of this application), its row in `workspace/applications.md`, `workspace/profile/` and `workspace/interview-bank/index.md`. Ask for the stage only if it is not obvious (screening, technical, manager, executive…). If the posting text is missing, get it as `cv-tailor` does (section 1 of `docs/posting-analysis.md`), and ask for it only as a last resort.
 2. **Estimate how likely each bank question is**, from the index:
    - **JD match:** its JD signals appear in the posting (strong if they are core requirements, medium if secondary);
    - **stage fit:** its Type and Stages fit this round (a screening asks experience and motivation; a technical round asks concepts and design; an executive round asks impact, leadership and judgment);

@@ -576,7 +576,7 @@ class Report(Workspace):
         self.assertEqual(data["open"][3]["repost_of"][0]["application"]["company"], "Repost Co")
         self.assertEqual(data["open"][4]["missing"], ["seniority"])
         self.assertEqual([(e["company"], e["rule_id"]) for e in data["filtered"]], [("Junior Co", "title_exclude")])
-        self.assertEqual(data["counts"], {"pass": 3, "repost": 1, "maybe": 1, "reject": 1, "to_decide": 0,
+        self.assertEqual(data["counts"], {"pass": 3, "repost": 1, "maybe": 1, "reject": 1, "to_apply": 0, "to_decide": 0,
                                           "pending_text": 0})
         self.assertEqual(len(jf.report(self.seen, TODAY, days=30)["filtered"]), 2)
 
@@ -593,7 +593,7 @@ class Report(Workspace):
         self.assertEqual([e["company"] for e in jf.report(self.seen, TODAY)["open"]], ["Still Open"])
 
     def analyse(self, key, **fields):
-        _, entry = jf.set_fields(key, [f"{k}={v}" for k, v in fields.items()], self.seen, self.ws, TODAY)
+        _, entry, _ = jf.set_fields(key, [f"{k}={v}" for k, v in fields.items()], self.seen, self.ws, TODAY)
         return entry
 
     def test_analysed_postings_to_decide_in_card_order(self):
@@ -682,13 +682,122 @@ class Report(Workspace):
         code, out, err = run_cli("--report", "--workspace", self.ws, "--date", TODAY)
         self.assertEqual(code, 0, err)
         data = json.loads(out)
-        self.assertEqual(data["counts"], {"pass": 1, "repost": 0, "maybe": 0, "reject": 1, "to_decide": 0,
+        self.assertEqual(data["counts"], {"pass": 1, "repost": 0, "maybe": 0, "reject": 1, "to_apply": 0, "to_decide": 0,
                                           "pending_text": 0})
         self.assertEqual(data["open"][0]["url"], "https://www.linkedin.com/jobs/view/9900000999/")
         with self.assertRaises(SystemExit), contextlib.redirect_stderr(io.StringIO()):
             jf.main(["--report", str(path), "--workspace", str(self.ws)])
         code, out, _ = run_cli("--report", "--workspace", self.ws / "nowhere")
         self.assertEqual(code, 2)
+
+
+class Decisions(Workspace):
+    """Stage 7: permanent numbers, the user's decisions, same_as, to_apply and --release-later."""
+
+    record = Report.record
+    analyse = Report.analyse
+
+    def test_numbers_are_permanent_and_in_order_of_arrival(self):
+        self.record(posting(job_id="5000002", url=None, company="Second"),
+                    posting(job_id="5000001", url=None, company="First"), day="2026-11-20")
+        results = jf.filter_postings([("m2", [posting(job_id="5000003", url=None, company="Third"),
+                                              posting(job_id="5000002", url=None, company="Second")])],
+                                     self.criteria, self.seen, self.applications, TODAY)
+        numbers = {k: e["n"] for k, e in self.seen["postings"].items()}
+        self.assertEqual(numbers, {"linkedin-5000002": 1, "linkedin-5000001": 2, "linkedin-5000003": 3})
+        self.assertEqual([(r["decision"], r["n"]) for r in results], [("pass", 3), ("duplicate", 1)])
+        self.assertEqual(jf.assign_numbers(self.seen), 0)
+        self.assertEqual({e["key"]: e["n"] for e in jf.report(self.seen, TODAY)["open"]}, numbers)
+
+    def test_old_seen_files_are_numbered_once_by_first_seen(self):
+        self.seen = {"version": 1, "postings": {
+            "linkedin-b": {"first_seen": "2026-11-20"}, "linkedin-a": {"first_seen": "2026-11-21"},
+            "linkedin-c": {"first_seen": "2026-11-20"}, "linkedin-d": {"first_seen": "2026-11-01", "n": 7}}}
+        self.assertEqual(jf.assign_numbers(self.seen), 3)
+        self.assertEqual({k: e["n"] for k, e in self.seen["postings"].items()},
+                         {"linkedin-b": 8, "linkedin-a": 10, "linkedin-c": 9, "linkedin-d": 7})
+
+    def test_set_by_number(self):
+        self.record(posting(job_id="5100001", url=None, company="One"), posting(job_id="5100002", url=None,
+                                                                                company="Two"))
+        key, entry, _ = jf.set_fields("#2", ["user_decision=discard", "user_reason=on-site"], self.seen, self.ws,
+                                      TODAY)
+        self.assertEqual((key, entry["user_decision"], entry["user_reason"]), ("linkedin-5100002", "discard",
+                                                                                 "on-site"))
+        for ref in ("#3", "#x", "2"):
+            with self.subTest(ref=ref), self.assertRaises(jf.ConfigError):
+                jf.set_fields(ref, ["user_decision=apply"], self.seen, self.ws, TODAY)
+        self.assertIn("#1 linkedin-5100001", jf.explain("#1", self.criteria, self.seen))
+
+    def test_a_new_decision_drops_the_old_reason(self):
+        self.record(posting())
+        jf.set_fields("#1", ["user_decision=later", "user_reason=after Mercanis"], self.seen, self.ws, TODAY)
+        _, entry, _ = jf.set_fields("#1", ["user_decision=apply"], self.seen, self.ws, TODAY)
+        self.assertIsNone(entry["user_reason"])
+
+    def test_decision_is_shared_by_the_same_job(self):
+        self.record(posting(job_id="5200001", url=None, company="Twice"),
+                    posting(job_id="5200002", url=None, company="Twice"),
+                    posting(job_id="5200003", url=None, company="Twice"))
+        self.analyse("linkedin-5200001", stage="analysed", recommendation="apply")
+        for alias in ("linkedin-5200002", "linkedin-5200003"):
+            self.analyse(alias, stage="analysed", recommendation="apply", same_as="linkedin-5200001")
+        _, _, others = jf.set_fields("linkedin-5200003", ["user_decision=apply", "user_reason=good fit"],
+                                     self.seen, self.ws, TODAY)
+        self.assertEqual(others, ["linkedin-5200001", "linkedin-5200002"])
+        for k in ("linkedin-5200001", "linkedin-5200002"):
+            e = self.seen["postings"][k]
+            self.assertEqual((e["user_decision"], e["user_reason"], e["user_decision_date"]),
+                             ("apply", "good fit", TODAY))
+            self.assertEqual(e["recommendation"], "apply")  # only the shared fields are copied
+        data = jf.report(self.seen, TODAY)
+        self.assertEqual([e["key"] for e in data["to_apply"]], ["linkedin-5200001"])
+        self.assertEqual(data["to_decide"], [])
+
+    def test_to_apply_until_the_posting_is_in_an_application_folder(self):
+        self.record(posting(job_id="5300001", url=None, company="Later Co"),
+                    posting(job_id="5300002", url=None, company="Not Analysed"),
+                    posting(job_id="5300003", url=None, company="Moved"), day="2026-11-24")
+        jf.set_fields("#3", ["user_decision=apply"], self.seen, self.ws, "2026-11-24")
+        jf.set_fields("#2", ["user_decision=apply"], self.seen, self.ws, TODAY)
+        jf.set_fields("#1", ["user_decision=apply"], self.seen, self.ws, TODAY)
+        self.assertEqual([e["n"] for e in jf.report(self.seen, TODAY)["to_apply"]], [3, 1, 2])
+        folder = self.ws / "output" / "moved-backend-engineer"
+        folder.mkdir(parents=True)
+        (folder / "job-posting.md").write_text("x", encoding="utf-8")
+        jf.set_fields("#3", ["posting_path=output/moved-backend-engineer/job-posting.md"], self.seen, self.ws, TODAY)
+        data = jf.report(self.seen, TODAY)
+        self.assertEqual([e["n"] for e in data["to_apply"]], [1, 2])
+        self.assertEqual(data["counts"]["to_apply"], 2)
+        self.assertEqual(data["open"] + data["to_decide"], [])
+
+    def test_release_later(self):
+        self.record(posting(job_id="5400001", url=None, company="Later"),
+                    posting(job_id="5400002", url=None, company="Discarded"))
+        self.analyse("linkedin-5400001", stage="analysed", recommendation="apply")
+        jf.set_fields("#1", ["user_decision=later", "user_reason=busy"], self.seen, self.ws, TODAY)
+        jf.set_fields("#2", ["user_decision=discard"], self.seen, self.ws, TODAY)
+        self.assertEqual(jf.report(self.seen, TODAY)["to_decide"], [])
+        self.assertEqual(jf.release_later(self.seen), ["linkedin-5400001"])
+        entry = self.seen["postings"]["linkedin-5400001"]
+        self.assertEqual((entry["user_decision"], entry["user_decision_date"], entry["user_reason"]),
+                         (None, None, None))
+        self.assertEqual([e["n"] for e in jf.report(self.seen, TODAY)["to_decide"]], [1])
+        self.assertEqual(jf.release_later(self.seen), [])
+
+    def test_cli(self):
+        self.record(posting(job_id="6000001", url=None))
+        del self.seen["postings"]["linkedin-6000001"]["n"]  # a seen.json written before the numbers
+        (self.ws / "jobs" / "seen.json").write_text(json.dumps(self.seen), encoding="utf-8")
+        code, out, err = run_cli("--set", "#1", "user_decision=later", "--workspace", self.ws, "--date", TODAY)
+        self.assertEqual(code, 0, err)  # the seen.json from before the numbers got its numbers
+        self.assertEqual((json.loads(out)["n"], json.loads(out)["also_set"]), (1, []))
+        code, out, err = run_cli("--release-later", "--workspace", self.ws, "--date", TODAY)
+        self.assertEqual((code, json.loads(out)), (0, {"released": ["linkedin-6000001"]}))
+        seen = json.loads((self.ws / "jobs" / "seen.json").read_text(encoding="utf-8"))
+        self.assertIsNone(seen["postings"]["linkedin-6000001"]["user_decision"])
+        with self.assertRaises(SystemExit), contextlib.redirect_stderr(io.StringIO()):
+            jf.main(["--release-later", "--report", "--workspace", str(self.ws)])
 
 
 if __name__ == "__main__":
