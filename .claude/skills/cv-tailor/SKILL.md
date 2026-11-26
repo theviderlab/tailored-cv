@@ -113,12 +113,12 @@ Best regards,
 
 1. **Read the sources:** all of `workspace/profile/`, the base CV, the base cover letter and `workspace/applications.md` (to detect whether the user already applied to that company).
 
-2. **Get the job posting.** If the user gives a link, use the web fetch tool (`WebFetch` in Claude Code, `webfetch` in OpenCode). If the fetch fails (LinkedIn blocks bots, login walls, JS-only pages), ask them to paste the posting text.
+2. **Get the job posting.** Follow section 1 of `docs/posting-analysis.md`: an analysis already saved by `job-inbox` (`workspace/jobs/postings/`), then `tools/posting-fetch` for the link the user gave, then the web fetch tool (`WebFetch` in Claude Code, `webfetch` in OpenCode), then a browser if one is available, and only as a last resort ask the user to paste the posting text.
 
-3. **Match the posting against the profile.** Extract the posting's requirements (skills, tools, experience, languages, conditions such as city or work mode) and classify them:
-   - **In the profile:** can be used directly.
-   - **In `gaps.md`:** not used and not asked about. If it is a core requirement, point it out to the user as a gap.
-   - **In the profile with `level: ?` or `evidence: ?`**, and the requirement matters in the posting: ask for the detail (one line is enough).
+3. **Match the posting against the profile.** Extract the posting's requirements (`must` / `nice`) and conditions and mark each against the profile as described in sections 2 and 3 of `docs/posting-analysis.md` (✅ covered · 🟡 partial · ❌ gap · ⛔ knock-out, each citing its source). If the posting comes from `job-inbox` with a `## Requirements` table, start from it and check it against the current profile. Then:
+   - **✅ In the profile:** can be used directly.
+   - **❌ In `gaps.md`:** not used and not asked about. If it is a core requirement, point it out to the user as a gap. A ⛔ is worth saying before going on.
+   - **🟡 In the profile with `level: ?` or `evidence: ?`**, and the requirement matters in the posting: ask for the detail (one line is enough).
    - **Not recorded anywhere:** ask.
 
    Ask **all the questions together in a single message**, short and specific. For example:

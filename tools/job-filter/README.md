@@ -21,6 +21,7 @@ uv run job_filter.py <extracted.json>... --update-seen                   # ...an
 uv run job_filter.py <posting.json> --recheck --update-seen              # second pass, with the full posting
 uv run job_filter.py --explain linkedin-4492981823                       # how each rule judges a recorded posting
 uv run job_filter.py --report [--days 7]                                 # what the inbox shows (JSON)
+uv run job_filter.py --set linkedin-4492981823 stage=analysed recommendation=apply   # record stage 2 results
 ```
 
 All of them take `--workspace DIR` (default: `workspace/` at the repo root), and `--criteria`, `--seen`, `--applications` to point at other files. `--date YYYY-MM-DD` sets the date recorded in `seen.json` (default: today). `uv` installs the only dependency, PyYAML, by itself.
@@ -102,9 +103,24 @@ The monthly factor defaults to 14 (Spain's 14 payments), the most lenient: a mon
 
 ## `seen.json`
 
-With `--update-seen`, each posting is recorded under its key in `workspace/jobs/seen.json`: the dates and mails it was seen in, its fields (never the posting text), and the filter decision (with `repost_of` for a repost). The skill adds the stage 2 recommendation, your decision and the path of the saved posting (`recommendation`, `user_decision`, `user_reason`, `posting_path`). This is what keeps deduplication and `--explain` working after the mail has been deleted.
+With `--update-seen`, each posting is recorded under its key in `workspace/jobs/seen.json`: the dates and mails it was seen in, its fields (never the posting text), and the filter decision (with `repost_of` for a repost). This is what keeps deduplication and `--explain` working after the mail has been deleted. Nobody edits the file by hand: the stage 2 results and your decisions are recorded with `--set` (below).
 
-`--recheck` is the second pass of stage 2: once the full posting has been read, the model corrects or completes the fields (real work mode, city, salary, contract) and the posting is judged again. The new fields are merged over the recorded ones, the posting is not treated as a duplicate of itself, and the decision is recorded as `pass: 2`.
+`--recheck` is the second pass of stage 2: once the full posting has been read, the model corrects or completes the fields (real work mode, city, salary, contract) and the posting is judged again. The new fields are merged over the recorded ones, the posting is not treated as a duplicate of itself (nor is the file counted as a mail it was seen in), and the decision is recorded as `pass: 2`.
+
+## `--set`
+
+`--set <key> field=value...` records the outcome of stage 2, or your decision, for a posting already in `seen.json`. Every value is checked; `null` clears a field.
+
+| Field | Values |
+|---|---|
+| `stage` | `filtered` (stage 1 done, waiting for stage 2) · `pending_text` (the posting's text could not be fetched: paste it) · `analysed` · `expired`. Changing it records `stage_date`. |
+| `recommendation` | `apply` · `apply_with_reservations` · `discard` |
+| `knockouts` | Number of unmet must-haves that admit no alternative |
+| `must_covered` | Share of must-have requirements covered, 0–1 |
+| `fit` | How well the core of the role matches the search: `high` · `medium` · `low` |
+| `posting_path` | The saved posting, relative to the workspace; it must exist |
+| `same_as` | Another key in `seen.json`: the same job posted twice, which shares its analysis |
+| `user_decision`, `user_reason` | `apply` · `discard` · `later`, and why. Records `user_decision_date`. |
 
 ## `--explain`
 
@@ -128,8 +144,12 @@ It reads the fields from `seen.json` and judges them with the current criteria, 
 
 What the skill needs to rebuild `workspace/jobs/inbox.md`, read from `seen.json` alone (so it keeps working after the mails are deleted), as JSON:
 
-- `open`: postings that got through (`pass`, `repost`, `maybe`) and that you have not decided on yet, in the order stage 2 takes them: `pass`, then `repost`, then `maybe`; within each, newest first, then fewest applicants, then fewest missing fields. Expired postings are left out.
-- `filtered`: postings rejected in the last `--days` days (default 7), newest first, with rule and reason.
+Postings you have decided on and expired ones are left out.
+
+- `to_decide`: postings analysed in stage 2, by recommendation (`apply`, `apply_with_reservations`, `discard`), then fewest knock-outs, highest share of must-haves covered and best fit. A posting the second pass rejected stays here as a `discard`, citing the rule, so you can disagree.
+- `open`: the stage 2 queue, postings that got through stage 1 (`pass`, `repost`, `maybe`) and are not analysed yet: `pass`, then `repost`, then `maybe`; within each, newest first, then fewest applicants, then fewest missing fields.
+- `pending_text`: postings whose text could not be fetched, in the same order.
+- `filtered`: postings rejected by stage 1 in the last `--days` days (default 7), newest first, with rule and reason.
 - `counts`: how many of each.
 
 ## Tests

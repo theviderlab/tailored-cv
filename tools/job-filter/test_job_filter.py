@@ -439,6 +439,11 @@ class Recheck(Workspace):
         self.assertEqual(entry["city"], "Barcelona")
         self.assertEqual(len(self.seen["postings"]), 1)
 
+    def test_second_pass_is_not_recorded_as_a_mail(self):
+        self.run_filter(posting(modality=None), mail_id="mail1")
+        self.run_filter(posting(modality="remote"), recheck=True, mail_id="recheck-linkedin-9900000999")
+        self.assertEqual(self.seen["postings"]["linkedin-9900000999"]["mail_ids"], ["mail1"])
+
     def test_without_recheck_it_is_a_duplicate(self):
         self.run_filter(posting())
         self.assertEqual(self.run_filter(posting(), recheck=False)[0]["decision"], "duplicate")
@@ -571,7 +576,8 @@ class Report(Workspace):
         self.assertEqual(data["open"][3]["repost_of"][0]["application"]["company"], "Repost Co")
         self.assertEqual(data["open"][4]["missing"], ["seniority"])
         self.assertEqual([(e["company"], e["rule_id"]) for e in data["filtered"]], [("Junior Co", "title_exclude")])
-        self.assertEqual(data["counts"], {"pass": 3, "repost": 1, "maybe": 1, "reject": 1})
+        self.assertEqual(data["counts"], {"pass": 3, "repost": 1, "maybe": 1, "reject": 1, "to_decide": 0,
+                                          "pending_text": 0})
         self.assertEqual(len(jf.report(self.seen, TODAY, days=30)["filtered"]), 2)
 
     def test_decided_expired_and_duplicate_postings_leave_the_inbox(self):
@@ -586,6 +592,86 @@ class Report(Workspace):
         self.seen["postings"]["linkedin-1000012"]["stage"] = "expired"
         self.assertEqual([e["company"] for e in jf.report(self.seen, TODAY)["open"]], ["Still Open"])
 
+    def analyse(self, key, **fields):
+        _, entry = jf.set_fields(key, [f"{k}={v}" for k, v in fields.items()], self.seen, self.ws, TODAY)
+        return entry
+
+    def test_analysed_postings_to_decide_in_card_order(self):
+        companies = ["Reserved", "Discarded", "Apply Low", "Apply High", "Apply Knockout", "Queued"]
+        self.record(*[posting(job_id=f"200000{i}", url=None, company=c) for i, c in enumerate(companies)])
+        self.analyse("linkedin-2000000", stage="analysed", recommendation="apply_with_reservations")
+        self.analyse("linkedin-2000001", stage="analysed", recommendation="discard", knockouts=1)
+        self.analyse("linkedin-2000002", stage="analysed", recommendation="apply", knockouts=0, must_covered=0.5,
+                     fit="high")
+        self.analyse("linkedin-2000003", stage="analysed", recommendation="apply", knockouts=0, must_covered=0.9,
+                     fit="medium")
+        self.analyse("linkedin-2000004", stage="analysed", recommendation="apply", knockouts=1, must_covered=1)
+        data = jf.report(self.seen, TODAY)
+        self.assertEqual([e["company"] for e in data["to_decide"]],
+                         ["Apply High", "Apply Low", "Apply Knockout", "Reserved", "Discarded"])
+        self.assertEqual([e["company"] for e in data["open"]], ["Queued"])
+        self.assertEqual(data["counts"]["to_decide"], 5)
+        self.assertEqual(data["to_decide"][0]["stage_date"], TODAY)
+
+    def test_second_pass_rejection_stays_to_decide(self):
+        self.record(posting(modality=None))
+        jf.filter_postings([("recheck", [posting(modality="onsite", city="Berlin")])], self.criteria, self.seen,
+                           self.applications, TODAY, recheck=True)
+        self.analyse("linkedin-9900000999", stage="analysed", recommendation="discard")
+        data = jf.report(self.seen, TODAY)
+        self.assertEqual([(e["key"], e["rule_id"]) for e in data["to_decide"]], [("linkedin-9900000999", "location")])
+        self.assertEqual(data["filtered"], [])
+
+    def test_pending_text_and_user_decisions(self):
+        self.record(posting(job_id="3000001", url=None, company="No Text"),
+                    posting(job_id="3000002", url=None, company="Decided"))
+        self.analyse("linkedin-3000001", stage="pending_text")
+        self.analyse("linkedin-3000002", stage="analysed", recommendation="apply")
+        self.analyse("linkedin-3000002", user_decision="later", user_reason="after the Mercanis process")
+        data = jf.report(self.seen, TODAY)
+        self.assertEqual([e["company"] for e in data["pending_text"]], ["No Text"])
+        self.assertEqual(data["open"] + data["to_decide"], [])
+        entry = self.seen["postings"]["linkedin-3000002"]
+        self.assertEqual((entry["user_decision"], entry["user_decision_date"]), ("later", TODAY))
+        self.analyse("linkedin-3000002", recommendation="null")
+        self.assertIsNone(entry["recommendation"])
+
+    def test_set_validates(self):
+        self.record(posting(), posting(job_id="4000001", url=None, company="Other"))
+        (self.ws / "jobs" / "postings").mkdir()
+        (self.ws / "jobs" / "postings" / "linkedin-9900000999.md").write_text("x", encoding="utf-8")
+        entry = self.analyse("LinkedIn-9900000999", posting_path="jobs/postings/linkedin-9900000999.md",
+                             same_as="linkedin-4000001", must_covered="0.6667")
+        self.assertEqual((entry["posting_path"], entry["same_as"], entry["must_covered"]),
+                         ("jobs/postings/linkedin-9900000999.md", "linkedin-4000001", 0.667))
+        bad = [("linkedin-1", ["stage=analysed"]), ("linkedin-9900000999", ["description=hi"]),
+               ("linkedin-9900000999", ["stage"]), ("linkedin-9900000999", ["stage=done"]),
+               ("linkedin-9900000999", ["stage=null"]), ("linkedin-9900000999", ["recommendation=maybe"]),
+               ("linkedin-9900000999", ["knockouts=-1"]), ("linkedin-9900000999", ["must_covered=1.5"]),
+               ("linkedin-9900000999", ["fit=great"]), ("linkedin-9900000999", ["posting_path=jobs/nope.md"]),
+               ("linkedin-9900000999", ["same_as=linkedin-9900000999"]), ("linkedin-9900000999", ["user_decision=yes"])]
+        for key, assignments in bad:
+            with self.subTest(assignments=assignments), self.assertRaises(jf.ConfigError):
+                jf.set_fields(key, assignments, self.seen, self.ws, TODAY)
+
+    def test_set_cli(self):
+        path = self.ws / "jobs" / "extracted" / "m.json"
+        path.parent.mkdir()
+        path.write_text(json.dumps([posting()]), encoding="utf-8")
+        run_cli(path, "--workspace", self.ws, "--update-seen", "--date", TODAY)
+        code, out, err = run_cli("--set", "linkedin-9900000999", "stage=analysed", "recommendation=apply", "fit=high",
+                                 "--workspace", self.ws, "--date", TODAY)
+        self.assertEqual(code, 0, err)
+        self.assertEqual(json.loads(out)["recommendation"], "apply")
+        seen = json.loads((self.ws / "jobs" / "seen.json").read_text(encoding="utf-8"))
+        self.assertEqual(seen["postings"]["linkedin-9900000999"]["fit"], "high")
+        code, out, _ = run_cli("--explain", "linkedin-9900000999", "--workspace", self.ws)
+        self.assertIn("Stage: analysed on 2026-11-25", out)
+        code, _, err = run_cli("--set", "linkedin-9900000999", "fit=great", "--workspace", self.ws)
+        self.assertEqual(code, 2)
+        with self.assertRaises(SystemExit), contextlib.redirect_stderr(io.StringIO()):
+            jf.main(["--set", "linkedin-9900000999", "--workspace", str(self.ws)])
+
     def test_cli(self):
         path = self.ws / "jobs" / "extracted" / "m.json"
         path.parent.mkdir()
@@ -596,7 +682,8 @@ class Report(Workspace):
         code, out, err = run_cli("--report", "--workspace", self.ws, "--date", TODAY)
         self.assertEqual(code, 0, err)
         data = json.loads(out)
-        self.assertEqual(data["counts"], {"pass": 1, "repost": 0, "maybe": 0, "reject": 1})
+        self.assertEqual(data["counts"], {"pass": 1, "repost": 0, "maybe": 0, "reject": 1, "to_decide": 0,
+                                          "pending_text": 0})
         self.assertEqual(data["open"][0]["url"], "https://www.linkedin.com/jobs/view/9900000999/")
         with self.assertRaises(SystemExit), contextlib.redirect_stderr(io.StringIO()):
             jf.main(["--report", str(path), "--workspace", str(self.ws)])

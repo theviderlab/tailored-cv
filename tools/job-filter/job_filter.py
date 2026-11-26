@@ -11,6 +11,7 @@ Usage:
                                                              second pass with the full posting (stage 2)
     uv run job_filter.py --explain <key>                     show how each rule judges a recorded posting
     uv run job_filter.py --report [--days 7]                 open postings and recent rejections, for the inbox
+    uv run job_filter.py --set <key> field=value...          record stage 2 results or the user's decision
     (all of them take --workspace DIR, --criteria, --seen, --applications and --date YYYY-MM-DD)
 
 The model extracts and normalizes the postings of each job alert into
@@ -619,8 +620,9 @@ def filter_postings(batches, criteria, seen, applications, today, recheck=False)
                                "date": today, "pass": 2 if stored else 1}
             if repost_of:  # kept for the stage 2 signals, which may come after the mail is gone
                 entry["filter"]["repost_of"] = repost_of
-            _add_unique(entry, "seen", today)
-            _add_unique(entry, "mail_ids", mail_id)
+            if not stored:  # a second pass reads the full posting, not a mail
+                _add_unique(entry, "seen", today)
+                _add_unique(entry, "mail_ids", mail_id)
     return results
 
 
@@ -651,6 +653,9 @@ def explain(key, criteria, seen):
     if f:
         stored = f.get("decision", "?") + (f" ({f['rule_id']})" if f.get("rule_id") else "")
         lines.append(f"Recorded decision: {stored} on {f.get('date', '?')}, pass {f.get('pass', 1)}: {f.get('reason', '')}")
+    if entry.get("stage") and entry["stage"] != "filtered":
+        lines.append(f"Stage: {entry['stage']}" + (f" on {entry['stage_date']}" if entry.get("stage_date") else "")
+                     + (f" · posting: {entry['posting_path']}" if entry.get("posting_path") else ""))
     for label, field in (("Recommendation", "recommendation"), ("Your decision", "user_decision")):
         if entry.get(field):
             lines.append(f"{label}: {entry[field]}" + (f" ({entry['user_reason']})"
@@ -679,10 +684,87 @@ def explain(key, criteria, seen):
     return "\n".join(lines)
 
 
+# ---------------------------------------------------------------- stage 2 results (--set)
+
+STAGES = ["filtered", "pending_text", "analysed", "expired"]
+RECOMMENDATIONS = ["apply", "apply_with_reservations", "discard"]
+USER_DECISIONS = ["apply", "discard", "later"]
+FITS = ["high", "medium", "low"]
+SETTABLE = ["stage", "recommendation", "knockouts", "must_covered", "fit", "posting_path", "same_as",
+            "user_decision", "user_reason"]
+NULLS = {"", "null", "none"}
+
+
+def set_fields(key, assignments, seen, workspace, today):
+    """Record stage 2 results (or the user's decision) for a posting: `field=value` strings, validated.
+
+    Returns the updated entry. Raises ConfigError on an unknown posting, field or value.
+    """
+    postings = seen["postings"]
+    match = next((k for k in postings if k.lower() == key.lower()), None)
+    if match is None:
+        raise ConfigError(f"'{key}' is not in seen.json")
+    entry = postings[match]
+    changes = {}
+    for assignment in assignments:
+        field, sep, value = assignment.partition("=")
+        field, value = field.strip(), value.strip()
+        if not sep or field not in SETTABLE:
+            raise ConfigError(f"'{assignment}': expected field=value with a field among {SETTABLE}")
+        if value.lower() in NULLS and field != "stage":
+            changes[field] = None
+            continue
+
+        def one_of(allowed):
+            if value.lower() not in allowed:
+                raise ConfigError(f"{field}: '{value}' is not one of {allowed}")
+            return value.lower()
+
+        if field == "stage":
+            changes[field] = one_of(STAGES)
+        elif field == "recommendation":
+            changes[field] = one_of(RECOMMENDATIONS)
+        elif field == "user_decision":
+            changes[field] = one_of(USER_DECISIONS)
+        elif field == "fit":
+            changes[field] = one_of(FITS)
+        elif field == "knockouts":
+            if not re.fullmatch(r"\d+", value):
+                raise ConfigError(f"knockouts: '{value}' is not a whole number")
+            changes[field] = int(value)
+        elif field == "must_covered":
+            try:
+                share = float(value)
+            except ValueError:
+                share = -1
+            if not 0 <= share <= 1:
+                raise ConfigError(f"must_covered: '{value}' is not a share between 0 and 1")
+            changes[field] = round(share, 3)
+        elif field == "posting_path":
+            path = Path(value)
+            if not (path if path.is_absolute() else Path(workspace) / path).is_file():
+                raise ConfigError(f"posting_path: {value} does not exist (paths are relative to the workspace)")
+            changes[field] = path.as_posix()
+        elif field == "same_as":
+            other = next((k for k in postings if k.lower() == value.lower()), None)
+            if other is None or other == match:
+                raise ConfigError(f"same_as: '{value}' is not another posting in seen.json")
+            changes[field] = other
+        else:  # user_reason: free text
+            changes[field] = value
+    if "stage" in changes and changes["stage"] != entry.get("stage"):
+        changes["stage_date"] = today
+    if "user_decision" in changes:
+        changes["user_decision_date"] = today if changes["user_decision"] else None
+    entry.update(changes)
+    return match, entry
+
+
 # ---------------------------------------------------------------- report
 
 OPEN_DECISIONS = ["pass", "repost", "maybe"]  # also the queue order of stage 2
 CLOSED_STAGES = {"expired"}
+QUEUE_STAGES = {None, "filtered"}
 REPORT_FIELDS = ["source", "job_id", "url", "title", "company", "location", "salary_text", "posted", "applicants",
                  "easy_apply", "title_en", "role_family", "seniority", "modality", "country", "city", "contract"]
 
@@ -699,37 +781,68 @@ def _applicant_count(entry):
     return a if isinstance(a, int) and not isinstance(a, bool) else float("inf")
 
 
+def _decide_order(e):
+    """Order of the analysed postings (spec §6.4): recommendation, knock-outs (fewest first),
+    share of must-haves covered (highest first), role fit; unknowns last."""
+    rec = e.get("recommendation")
+    knockouts = e.get("knockouts")
+    covered = e.get("must_covered")
+    fit = e.get("fit")
+    return (RECOMMENDATIONS.index(rec) if rec in RECOMMENDATIONS else len(RECOMMENDATIONS),
+            knockouts if isinstance(knockouts, int) else float("inf"),
+            -covered if isinstance(covered, (int, float)) else 1,
+            FITS.index(fit) if fit in FITS else len(FITS),
+            -_ordinal(e["first_seen"]), e["key"])
+
+
 def report(seen, today, days=7):
     """What the job-inbox tray shows, from seen.json alone (so it works after the mails are gone).
 
-    open: postings that got through stage 1 (pass, repost, maybe) with no decision from the user yet,
-    in stage 2 queue order: pass, then repost, then maybe; newest first; then fewest applicants;
-    then fewest missing fields.
+    Only postings without a decision from the user and not expired:
+    to_decide: analysed in stage 2, in the order of _decide_order (also those a second pass rejected:
+    they show as "discard", citing the rule).
+    open: the stage 2 queue, postings that got through stage 1 (pass, repost, maybe) and are not analysed
+    yet: pass, then repost, then maybe; newest first; then fewest applicants; then fewest missing fields.
+    pending_text: stage 2 could not get the posting's text; the user has to paste it.
     filtered: postings rejected by stage 1 in the last `days` days, newest first.
     """
     since = date.fromordinal(_ordinal(today) - days).isoformat()
-    open_, filtered = [], []
+    to_decide, open_, pending, filtered = [], [], [], []
     for key, entry in seen["postings"].items():
         f = entry.get("filter") or {}
+        stage = entry.get("stage")
         item = {"key": key, **{field: entry.get(field) for field in REPORT_FIELDS},
                 "first_seen": entry.get("first_seen"), "seen": entry.get("seen") or [],
-                "mail_ids": entry.get("mail_ids") or [], "stage": entry.get("stage"),
+                "mail_ids": entry.get("mail_ids") or [], "stage": stage,
                 "decision": f.get("decision"), "rule_id": f.get("rule_id"), "reason": f.get("reason"),
                 "missing": f.get("missing") or [], "filter_date": f.get("date"), "filter_pass": f.get("pass", 1)}
-        if f.get("decision") in OPEN_DECISIONS and not entry.get("user_decision") \
-                and entry.get("stage") not in CLOSED_STAGES:
-            item.update(repost_of=f.get("repost_of") or [], recommendation=entry.get("recommendation"),
-                        posting_path=entry.get("posting_path"))
-            open_.append(item)
-        elif f.get("decision") == "reject" and (f.get("date") or "") >= since:
+        undecided = not entry.get("user_decision") and stage not in CLOSED_STAGES
+        stage2 = {"repost_of": f.get("repost_of") or [], "recommendation": entry.get("recommendation"),
+                  "knockouts": entry.get("knockouts"), "must_covered": entry.get("must_covered"),
+                  "fit": entry.get("fit"), "posting_path": entry.get("posting_path"),
+                  "same_as": entry.get("same_as"), "stage_date": entry.get("stage_date")}
+        if undecided and stage == "analysed" and f.get("decision") != "duplicate":
+            to_decide.append({**item, **stage2})
+        elif undecided and f.get("decision") in OPEN_DECISIONS and stage == "pending_text":
+            pending.append({**item, **stage2})
+        elif undecided and f.get("decision") in OPEN_DECISIONS and stage in QUEUE_STAGES:
+            open_.append({**item, **stage2})
+        elif f.get("decision") == "reject" and stage not in ("analysed", "pending_text") \
+                and (f.get("date") or "") >= since:
             item["user_decision"] = entry.get("user_decision")
             filtered.append(item)
-    open_.sort(key=lambda e: (OPEN_DECISIONS.index(e["decision"]), -_ordinal(e["first_seen"]),
-                              _applicant_count(seen["postings"][e["key"]]), len(e["missing"]), e["key"]))
+    to_decide.sort(key=_decide_order)
+    queue_order = lambda e: (OPEN_DECISIONS.index(e["decision"]), -_ordinal(e["first_seen"]),  # noqa: E731
+                             _applicant_count(seen["postings"][e["key"]]), len(e["missing"]), e["key"])
+    open_.sort(key=queue_order)
+    pending.sort(key=queue_order)
     filtered.sort(key=lambda e: (-_ordinal(e["filter_date"]), e["key"]))
     counts = {d: sum(e["decision"] == d for e in open_) for d in OPEN_DECISIONS}
     counts["reject"] = len(filtered)
-    return {"date": today, "days": days, "open": open_, "filtered": filtered, "counts": counts}
+    counts["to_decide"] = len(to_decide)
+    counts["pending_text"] = len(pending)
+    return {"date": today, "days": days, "to_decide": to_decide, "open": open_, "pending_text": pending,
+            "filtered": filtered, "counts": counts}
 
 
 # ---------------------------------------------------------------- CLI
@@ -756,6 +869,9 @@ def main(argv=None):
     parser.add_argument("--explain", metavar="KEY", help="show how each rule judges a posting recorded in seen.json")
     parser.add_argument("--report", action="store_true",
                         help="print what the inbox shows: open postings and recent rejections, from seen.json")
+    parser.add_argument("--set", nargs="+", metavar=("KEY", "FIELD=VALUE"), dest="set_fields",
+                        help="record stage 2 results or the user's decision for a posting in seen.json: "
+                             + ", ".join(SETTABLE) + " (value null clears a field)")
     parser.add_argument("--days", type=int, default=7, help="--report: rejections of the last N days (default 7)")
     parser.add_argument("--update-seen", action="store_true", help="record the results in seen.json")
     parser.add_argument("--recheck", action="store_true",
@@ -774,8 +890,10 @@ def main(argv=None):
     applications_path = args.applications or args.workspace / "applications.md"
     if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", args.date) or not _ordinal(args.date):
         parser.error("--date must be YYYY-MM-DD")
-    if sum((bool(args.explain), bool(args.report), bool(args.extracted))) != 1:
-        parser.error("give extracted .json files, --explain KEY or --report")
+    if sum((bool(args.explain), bool(args.report), bool(args.extracted), bool(args.set_fields))) != 1:
+        parser.error("give extracted .json files, --explain KEY, --report or --set KEY FIELD=VALUE...")
+    if args.set_fields and len(args.set_fields) < 2:
+        parser.error("--set needs a posting key and at least one FIELD=VALUE")
     if args.days < 0:
         parser.error("--days must be 0 or more")
     try:
@@ -788,6 +906,12 @@ def main(argv=None):
             return 0
         if args.report:
             print(json.dumps(report(seen, args.date, args.days), ensure_ascii=False, indent=2))
+            return 0
+        if args.set_fields:
+            key, entry = set_fields(args.set_fields[0], args.set_fields[1:], seen, args.workspace, args.date)
+            save_seen(seen_path, seen)
+            shown = ["stage", "stage_date"] + SETTABLE[1:] + ["user_decision_date"]
+            print(json.dumps({"key": key, **{f: entry.get(f) for f in shown}}, ensure_ascii=False, indent=2))
             return 0
         batches = read_batches(args.extracted)
         results = filter_postings(batches, criteria, seen, read_applications(applications_path), args.date,
