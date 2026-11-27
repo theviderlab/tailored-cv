@@ -577,7 +577,7 @@ class Report(Workspace):
         self.assertEqual(data["open"][4]["missing"], ["seniority"])
         self.assertEqual([(e["company"], e["rule_id"]) for e in data["filtered"]], [("Junior Co", "title_exclude")])
         self.assertEqual(data["counts"], {"pass": 3, "repost": 1, "maybe": 1, "reject": 1, "to_apply": 0, "to_decide": 0,
-                                          "pending_text": 0})
+                                          "pending_text": 0, "applied": 0})
         self.assertEqual(len(jf.report(self.seen, TODAY, days=30)["filtered"]), 2)
 
     def test_decided_expired_and_duplicate_postings_leave_the_inbox(self):
@@ -595,6 +595,51 @@ class Report(Workspace):
     def analyse(self, key, **fields):
         _, entry, _ = jf.set_fields(key, [f"{k}={v}" for k, v in fields.items()], self.seen, self.ws, TODAY)
         return entry
+
+    def test_postings_applied_outside_cv_tailor_leave_the_inbox(self):
+        self.record(posting(job_id="5000001", url=None, company="By Link"),
+                    posting(job_id="5000002", url=None, company="By Name", title="Platform Engineer"),
+                    posting(job_id="5000003", url=None, company="To Apply"),
+                    posting(job_id="5000004", url=None, company="Pending"),
+                    posting(job_id="5000005", url=None, company="Still Open"))
+        self.analyse("linkedin-5000001", stage="analysed", recommendation="apply")
+        self.analyse("linkedin-5000003", user_decision="apply")
+        self.analyse("linkedin-5000004", stage="pending_text")
+        log = self.ws / "applications.md"
+        log.write_text("""| Date | Company | Role | Folder | Link | Status | Notes |
+|---|---|---|---|---|---|---|
+| 2026-11-25 | By Link | Senior Backend Engineer | — | https://www.linkedin.com/jobs/view/5000001/ | sent | Easy Apply |
+| 2026-11-25 | By Name S.L. | Platform engineer | — | — | ? | |
+| 2026-11-25 | To Apply | Senior Backend Engineer | `output/to-apply/` | https://www.linkedin.com/jobs/view/5000003/ | sent | |
+| 2026-11-25 | Pending | Senior Backend Engineer | — | https://www.linkedin.com/jobs/view/5000004/ | sent | |
+""", encoding="utf-8")
+        before = copy.deepcopy(self.seen)
+        data = jf.report(self.seen, TODAY, applications=jf.read_applications(log))
+        self.assertEqual(self.seen, before)  # read-only
+        self.assertEqual([e["company"] for e in data["open"]], ["Still Open"])
+        self.assertEqual(data["to_decide"] + data["to_apply"] + data["pending_text"], [])
+        self.assertEqual([(e["company"], e["application"]["status"]) for e in data["applied"]],
+                         [("By Link", "sent"), ("By Name", "?"), ("To Apply", "sent"), ("Pending", "sent")])
+        self.assertEqual(data["applied"][2]["user_decision"], "apply")
+        self.assertEqual(data["counts"]["applied"], 4)
+        # without the log (or another company's row), everything is back
+        data = jf.report(self.seen, TODAY)
+        self.assertEqual((len(data["to_decide"]), len(data["to_apply"]), len(data["pending_text"]), len(data["open"])),
+                         (1, 1, 1, 2))
+
+    def test_report_cli_reads_applications(self):
+        path = self.ws / "jobs" / "extracted" / "m.json"
+        path.parent.mkdir()
+        path.write_text(json.dumps([posting()]), encoding="utf-8")
+        run_cli(path, "--workspace", self.ws, "--update-seen", "--date", TODAY)
+        (self.ws / "applications.md").write_text(
+            "| D | C | R | F | L | S | N |\n|---|---|---|---|---|---|---|\n"
+            "| 2026-11-25 | Acme Software | x | — | https://www.linkedin.com/jobs/view/9900000999/ | sent | |\n",
+            encoding="utf-8")
+        code, out, err = run_cli("--report", "--workspace", self.ws, "--date", TODAY)
+        self.assertEqual(code, 0, err)
+        data = json.loads(out)
+        self.assertEqual((data["open"], [e["n"] for e in data["applied"]]), ([], [1]))
 
     def test_analysed_postings_to_decide_in_card_order(self):
         companies = ["Reserved", "Discarded", "Apply Low", "Apply High", "Apply Knockout", "Queued"]
@@ -683,7 +728,7 @@ class Report(Workspace):
         self.assertEqual(code, 0, err)
         data = json.loads(out)
         self.assertEqual(data["counts"], {"pass": 1, "repost": 0, "maybe": 0, "reject": 1, "to_apply": 0, "to_decide": 0,
-                                          "pending_text": 0})
+                                          "pending_text": 0, "applied": 0})
         self.assertEqual(data["open"][0]["url"], "https://www.linkedin.com/jobs/view/9900000999/")
         with self.assertRaises(SystemExit), contextlib.redirect_stderr(io.StringIO()):
             jf.main(["--report", str(path), "--workspace", str(self.ws)])

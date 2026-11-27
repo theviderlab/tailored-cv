@@ -152,7 +152,7 @@ Best regards,
    - (company and role as slugs: lowercase, no spaces or accents, separated by `-`. File names keep the slug so the PDFs remain identifiable when sent.)
    - If the folder already exists (same company and role), ask the user whether to overwrite or use a suffix (e.g. `-2`).
    - **The posting goes in the folder too**, as `workspace/output/<company>-<role>/job-posting.md` (`/interview prep` reads it there). If one is already there, ask before replacing it.
-     - From `job-inbox` (`workspace/jobs/postings/<key>.md`): **move** the file as it is (front matter, `## Card`, `## Requirements`, `## Posting`), then record the new path: `uv run tools/job-filter/job_filter.py --set <key> posting_path=output/<company>-<role>/job-posting.md`. That takes it out of the inbox's "To apply".
+     - From `job-inbox` (`workspace/jobs/postings/<key>.md`): **move** the file as it is (front matter, `## Card`, `## Requirements`, `## Posting`), then record the new path: `uv run tools/job-filter/job_filter.py --set <key> posting_path=output/<company>-<role>/job-posting.md`. That takes it out of `job-filter --report`; the inbox file is rebuilt in step 9.
      - Otherwise, write it with the layout of `docs/posting-analysis.md` ("Saving it" in section 1, "Saving the analysis" in section 4), without the card: front matter (`url`, `fetched`, `text_source`, `title`, `company`, `location`), `# <title> — <company>`, `## Requirements` (the table of step 3, with the marks the user's answers changed) and `## Posting` (the text as you got it, untouched).
 
 7. **Verify before building.** Compare the new file against the base CV and produce a short report:
@@ -178,12 +178,17 @@ Best regards,
 
 9. **Log the application** in `workspace/applications.md`: add a row at the top with date, company, role, folder, posting link (if any; the canonical one, e.g. `https://www.linkedin.com/jobs/view/<id>/`, never a link with tracking parameters: `job-inbox` recognizes postings already applied to by it), status `sent` (or `?` if the user has not confirmed sending it) and short notes (e.g. language).
 
+   **Where to apply.** When handing over the PDFs, always tell the user where to send them, in one line: the posting's link (the `url` in the front matter of `job-posting.md`, which is the canonical one; for a posting from `job-inbox` the user may never have seen it) and how to apply if the posting says (Easy Apply, the company's form, an email address). For a role that came in a recruiter's message (`text_source: "message"`, no link), say it goes back to that recruiter and name them. Never guess a link.
+
+   **Inbox.** If `workspace/jobs/inbox.md` exists, rebuild it now, as the `job-inbox` skill describes in "The inbox file": the posting moved in step 6, or the new row in `applications.md`, takes it out of the inbox.
+
 10. **Suggest base CV improvements (optional).** If the log shows something was added in 3 or more recent applications (e.g. SQL or LangChain), or that a base bullet is always removed, suggest in one line that the user update the base CV. Do not edit it without their approval.
 
 ## Other uses
 
 - **"Add X to my profile" / "I now know X":** update the matching profile file with `source: conversation (<date>)`, without building a CV.
 - **"Update the application status to X":** edit the row in `workspace/applications.md`.
+- **"I applied to X myself" (Easy Apply, the company's site):** add the row to `workspace/applications.md` with the canonical posting link, and rebuild `workspace/jobs/inbox.md` if it exists (the row takes the posting out of it).
 - **"Review / audit / improve my profile for ATS"** (no posting): not this skill's job, use `profile-audit`.
 - If step 3 surfaces weak data the posting does not ask about (dates without months, bullets without metrics), do not ask about it now: suggest running `profile-audit` in one line.
 

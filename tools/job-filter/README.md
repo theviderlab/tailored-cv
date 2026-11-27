@@ -150,7 +150,7 @@ It reads the fields from `seen.json` and judges them with the current criteria, 
 
 ## `--report`
 
-What the skill needs to rebuild `workspace/jobs/inbox.md`, read from `seen.json` alone (so it keeps working after the mails are deleted), as JSON:
+What the skill needs to rebuild `workspace/jobs/inbox.md`, read from `seen.json` (so it keeps working after the mails are deleted) and `applications.md`, as JSON. It never writes anything:
 
 Every item carries its number `n`.
 
@@ -162,6 +162,7 @@ The other lists leave out the postings you have decided on and the expired ones:
 - `open`: the stage 2 queue, postings that got through stage 1 (`pass`, `repost`, `maybe`) and are not analysed yet: `pass`, then `repost`, then `maybe`; within each, newest first, then fewest applicants, then fewest missing fields.
 - `pending_text`: postings whose text could not be fetched, in the same order.
 - `filtered`: postings rejected by stage 1 in the last `--days` days (default 7), newest first, with rule and reason.
+- `applied`: postings that would be in `to_apply`, `to_decide`, `open` or `pending_text` but already have a row in `applications.md` (same job ID from the row's link, or same company and role), with that row. This covers an application made outside `cv-tailor` (Easy Apply, the company's site): the posting leaves the other lists as soon as its row is added.
 - `counts`: how many of each.
 
 ## Tests

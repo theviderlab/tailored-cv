@@ -855,8 +855,9 @@ def _decide_order(e):
             -_ordinal(e["first_seen"]), e["key"])
 
 
-def report(seen, today, days=7):
-    """What the job-inbox tray shows, from seen.json alone (so it works after the mails are gone).
+def report(seen, today, days=7, applications=()):
+    """What the job-inbox tray shows, from seen.json (so it works after the mails are gone) and the
+    rows of applications.md.
 
     Every item carries the posting's permanent number `n`.
     to_apply: the user decided to apply and cv-tailor has not moved the posting into an application
@@ -869,9 +870,12 @@ def report(seen, today, days=7):
     yet: pass, then repost, then maybe; newest first; then fewest applicants; then fewest missing fields.
     pending_text: stage 2 could not get the posting's text; the user has to paste it.
     filtered: postings rejected by stage 1 in the last `days` days, newest first.
+    applied: postings that would be in to_apply, to_decide, open or pending_text but already have a row
+    in applications.md (an application made outside cv-tailor, or one whose posting was not moved):
+    they leave those sections and are listed here with the row, so the skill can tell the user.
     """
     since = date.fromordinal(_ordinal(today) - days).isoformat()
-    to_apply, to_decide, open_, pending, filtered = [], [], [], [], []
+    to_apply, to_decide, open_, pending, filtered, applied = [], [], [], [], [], []
     for key, entry in seen["postings"].items():
         f = entry.get("filter") or {}
         stage = entry.get("stage")
@@ -885,16 +889,29 @@ def report(seen, today, days=7):
                   "knockouts": entry.get("knockouts"), "must_covered": entry.get("must_covered"),
                   "fit": entry.get("fit"), "posting_path": entry.get("posting_path"),
                   "same_as": entry.get("same_as"), "stage_date": entry.get("stage_date")}
+        section = None
         if entry.get("user_decision") == "apply":
             if not entry.get("same_as") and not (entry.get("posting_path") or "").startswith("output/"):
-                to_apply.append({**item, **stage2, "user_reason": entry.get("user_reason"),
-                                 "user_decision_date": entry.get("user_decision_date")})
+                section = to_apply
+                stage2 = {**stage2, "user_reason": entry.get("user_reason"),
+                          "user_decision_date": entry.get("user_decision_date")}
         elif undecided and stage == "analysed" and f.get("decision") != "duplicate":
-            to_decide.append({**item, **stage2})
+            section = to_decide
         elif undecided and f.get("decision") in OPEN_DECISIONS and stage == "pending_text":
-            pending.append({**item, **stage2})
+            section = pending
         elif undecided and f.get("decision") in OPEN_DECISIONS and stage in QUEUE_STAGES:
-            open_.append({**item, **stage2})
+            section = open_
+        if section is not None:
+            row = next((r for r in applications if same_posting(entry, r)), None)
+            if row is not None:
+                applied.append({"n": entry.get("n"), "key": key, "title": entry.get("title"),
+                                "company": entry.get("company"), "url": entry.get("url"),
+                                "user_decision": entry.get("user_decision"),
+                                "application": _application_ref(row)})
+            else:
+                section.append({**item, **stage2})
+        elif entry.get("user_decision") == "apply":
+            pass  # already in its application folder
         elif f.get("decision") == "reject" and stage not in ("analysed", "pending_text") \
                 and (f.get("date") or "") >= since:
             item["user_decision"] = entry.get("user_decision")
@@ -911,8 +928,10 @@ def report(seen, today, days=7):
     counts["to_apply"] = len(to_apply)
     counts["to_decide"] = len(to_decide)
     counts["pending_text"] = len(pending)
+    applied.sort(key=lambda e: (e["n"] or 0, e["key"]))
+    counts["applied"] = len(applied)
     return {"date": today, "days": days, "to_apply": to_apply, "to_decide": to_decide, "open": open_,
-            "pending_text": pending, "filtered": filtered, "counts": counts}
+            "pending_text": pending, "filtered": filtered, "applied": applied, "counts": counts}
 
 
 # ---------------------------------------------------------------- CLI
@@ -981,7 +1000,8 @@ def main(argv=None):
             print(explain(args.explain, criteria, seen))
             return 0
         if args.report:
-            print(json.dumps(report(seen, args.date, args.days), ensure_ascii=False, indent=2))
+            print(json.dumps(report(seen, args.date, args.days, read_applications(applications_path)),
+                             ensure_ascii=False, indent=2))
             return 0
         if args.release_later:
             released = release_later(seen)
