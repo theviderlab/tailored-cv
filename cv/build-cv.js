@@ -22,6 +22,7 @@ const SECTIONS = {
   'Executive Profile': { slot: 'summary' },
   'Core Competencies & Technical Skills': { slot: 'skills' },
   'Professional Experience': { slot: 'experience' },
+  'Projects': { slot: 'projects' },
   'Education & Certifications': { slot: 'education' },
   'Community Leadership & Tech Advocacy': { slot: 'community' },
 };
@@ -111,6 +112,10 @@ function renderSection(section, lang) {
       return renderList(title, section.blocks);
     case 'experience':
       return renderExperience(title, section.blocks);
+    case 'projects':
+      // Optional section: it carries its own wrapper so a CV without
+      // projects leaves no empty <section> (and no extra margin) behind.
+      return `<section class="section">\n${renderExperience(title, section.blocks)}\n</section>`;
     case 'community':
       return renderCommunity(title, section.blocks);
     default:
@@ -160,6 +165,7 @@ function main() {
     SUMMARY: '',
     SKILLS: '',
     EXPERIENCE: '',
+    PROJECTS: '',
     EDUCATION: '',
     COMMUNITY: '',
   };

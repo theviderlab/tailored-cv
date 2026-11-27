@@ -5,6 +5,7 @@
       "Executive Profile": "Summary",
       "Core Competencies & Technical Skills": "Skills",
       "Professional Experience": "Professional Experience",
+      "Projects": "Projects",
       "Education & Certifications": "Education & Certifications",
       "Community Leadership & Tech Advocacy": "Volunteer Experience"
     },
@@ -16,6 +17,7 @@
       "Executive Profile": "Perfil profesional",
       "Core Competencies & Technical Skills": "Habilidades",
       "Professional Experience": "Experiencia profesional",
+      "Projects": "Proyectos",
       "Education & Certifications": "Formación y certificaciones",
       "Community Leadership & Tech Advocacy": "Voluntariado"
     },

@@ -58,6 +58,11 @@ The base CV and base cover letter **are not edited** unless the user asks. The p
 ### <Role 2> — *<Org 2>* (<Dates 2>)
 - ...
 
+## Projects
+### <Project> — *<Context>* (<Dates>)
+- **<Label>:** <description>
+- ...
+
 ## Community Leadership & Tech Advocacy
 **<Title> | <Community>** (<Frequency>)
 - <bullet>
@@ -70,6 +75,7 @@ The base CV and base cover letter **are not edited** unless the user asks. The p
 
 - The contact lines use `- **Key:** value`. LinkedIn/GitHub take a markdown link; Email/Cell/Location have no link.
 - Each experience `###` follows exactly `Role — *Org* (Dates)` (separated by an em dash `—`). Dates use `MMM YYYY – MMM YYYY` or `MMM YYYY – Present` when the profile has the months; if it only has the year, use the year.
+- `## Projects` is optional (own, open-source or academic projects; client work stays under its role in Professional Experience). Each `###` uses the same `Name — *Context* (Dates)` format as a role.
 - Use `**bold**` for each bullet's label (e.g. `**End-to-End AI Leadership:** ...`).
 
 ### Language
