@@ -15,6 +15,8 @@ uv run tools/posting-fetch/posting_fetch.py --url "https://www.linkedin.com/jobs
 
 `--force` downloads again a posting already saved; `--workspace DIR` points at another workspace (default: `workspace/`).
 
+`--check <key>...` only tells whether each posting still takes applications, and saves nothing: the saved posting and its analysis stay as they are. `job-inbox` uses it for postings recommended to apply to that nobody decided on, two weeks after they were analysed (see `job-filter --prune`). Result per posting: `open`, `closed` (the portal says it no longer accepts applications, the page is gone with HTTP 404/410, or its `validThrough` date has passed), `failed` (cannot tell: network error, login wall, too little text) or `unsupported`.
+
 ## Which pages it visits
 
 Mail is not trusted (links in it can log you in, unsubscribe you or point anywhere), so for a posting from a mail the URL is never taken as is:

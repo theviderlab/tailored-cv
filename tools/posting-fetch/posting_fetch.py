@@ -7,7 +7,8 @@
 Usage:
     uv run posting_fetch.py <key>...          postings recorded in workspace/jobs/seen.json
     uv run posting_fetch.py --url <url>       a posting link the user gave in the chat
-    (both take --workspace DIR and --force to download again a posting already saved)
+    uv run posting_fetch.py --check <key>...  only tell whether each posting is still open; saves nothing
+    (all take --workspace DIR; downloading takes --force to download again a posting already saved)
 
 For a key in seen.json the URL is never taken as is from a mail: it is built from the portal and the
 job ID (LinkedIn: the public jobs-guest endpoint, which needs no login), or it is the clean link the
@@ -279,11 +280,8 @@ def render(key, url, meta, body, hidden, lines, today):
     return "\n".join(out)
 
 
-def fetch_one(key, url, request_url, parser, postings_dir, today, force=False, get=http_get, sleep=time.sleep):
-    path = postings_dir / f"{key}.md"
-    result = {"key": key, "url": url, "path": path.as_posix(), "status": None, "reason": None}
-    if path.exists() and not force:
-        return {**result, "status": "exists"}
+def download(request_url, get=http_get, sleep=time.sleep):
+    """(final url, markup, None), or (None, None, (reason, HTTP code or None)) when it failed."""
     for attempt in range(len(RETRY_WAITS) + 1):
         try:
             final_url, markup = get(request_url)
@@ -294,11 +292,45 @@ def fetch_one(key, url, request_url, parser, postings_dir, today, force=False, g
                 wait = int(retry_after) if retry_after and str(retry_after).isdigit() else RETRY_WAITS[attempt]
                 sleep(min(wait, 60))
                 continue
-            return {**result, "status": "failed", "reason": f"HTTP {e.code}", "path": None}
+            return None, None, (f"HTTP {e.code}", e.code)
         except (urllib.error.URLError, TimeoutError, OSError) as e:
-            return {**result, "status": "failed", "reason": f"network error: {getattr(e, 'reason', e)}", "path": None}
+            return None, None, (f"network error: {getattr(e, 'reason', e)}", None)
     if re.search(r"/(authwall|login|signin|uas/login)", urlsplit(final_url).path, re.I):
-        return {**result, "status": "failed", "reason": "the portal asks to log in", "path": None}
+        return None, None, ("the portal asks to log in", None)
+    return final_url, markup, None
+
+
+def check_one(key, url, request_url, parser, today, get=http_get, sleep=time.sleep):
+    """Whether a posting still takes applications, without saving anything (the saved posting and its
+    analysis stay as they are). Status: open, closed or failed (could not tell)."""
+    result = {"key": key, "url": url, "status": None, "reason": None}
+    _, markup, failure = download(request_url, get, sleep)
+    if failure:
+        reason, code = failure
+        if code in (404, 410):
+            return {**result, "status": "closed", "reason": f"{reason}: the posting is gone"}
+        return {**result, "status": "failed", "reason": reason}
+    meta, body, _, _ = parser(markup)
+    if meta.get("closed"):
+        return {**result, "status": "closed", "reason": "the portal says it no longer accepts applications"}
+    for jp in _job_postings(markup):
+        valid = str(jp.get("validThrough") or "")[:10]
+        if re.fullmatch(r"\d{4}-\d{2}-\d{2}", valid) and valid < today:
+            return {**result, "status": "closed", "reason": f"valid through {valid}"}
+    if len(body) < MIN_TEXT:
+        return {**result, "status": "failed",
+                "reason": f"only {len(body)} characters of text: cannot tell whether it is open"}
+    return {**result, "status": "open"}
+
+
+def fetch_one(key, url, request_url, parser, postings_dir, today, force=False, get=http_get, sleep=time.sleep):
+    path = postings_dir / f"{key}.md"
+    result = {"key": key, "url": url, "path": path.as_posix(), "status": None, "reason": None}
+    if path.exists() and not force:
+        return {**result, "status": "exists"}
+    final_url, markup, failure = download(request_url, get, sleep)
+    if failure:
+        return {**result, "status": "failed", "reason": failure[0], "path": None}
     meta, body, hidden, lines = parser(markup)
     if len(body) < MIN_TEXT:
         return {**result, "status": "failed", "path": None,
@@ -317,7 +349,7 @@ def key_for_url(url):
     return f"{host}-{hashlib.sha1(url.encode()).hexdigest()[:10]}", {"source": host, "job_id": None, "url": url}
 
 
-def run(keys, urls, workspace, today, force=False, get=http_get, delay=DELAY, sleep=time.sleep):
+def run(keys, urls, workspace, today, force=False, get=http_get, delay=DELAY, sleep=time.sleep, check=False):
     postings_dir = Path(workspace) / "jobs" / "postings"
     jobs = []
     if keys:
@@ -346,12 +378,18 @@ def run(keys, urls, workspace, today, force=False, get=http_get, delay=DELAY, sl
         if request_url is None and entry.get("_any_host") and url:
             request_url, parser = url, parse_generic
         if request_url is None:
-            results.append({"key": key, "url": url, "path": None, "status": "unsupported", "reason": parser})
+            result = {"key": key, "url": url, "path": None, "status": "unsupported", "reason": parser}
+            if check:
+                del result["path"]
+            results.append(result)
             continue
         wait = last + delay - time.monotonic()
-        if wait > 0 and not (postings_dir / f"{key}.md").exists():
+        if wait > 0 and (check or not (postings_dir / f"{key}.md").exists()):
             sleep(wait)
-        result = fetch_one(key, url, request_url, parser, postings_dir, today, force=force, get=get, sleep=sleep)
+        if check:
+            result = check_one(key, url, request_url, parser, today, get=get, sleep=sleep)
+        else:
+            result = fetch_one(key, url, request_url, parser, postings_dir, today, force=force, get=get, sleep=sleep)
         if result["status"] != "exists":
             last = time.monotonic()
         results.append(result)
@@ -363,6 +401,8 @@ def main(argv=None):
     parser.add_argument("keys", nargs="*", help="posting keys recorded in jobs/seen.json (linkedin-4492981823)")
     parser.add_argument("--url", action="append", default=[], help="a posting link the user gave (repeatable)")
     parser.add_argument("--force", action="store_true", help="download again postings already saved")
+    parser.add_argument("--check", action="store_true",
+                        help="only tell whether each posting is still open (open, closed, failed); saves nothing")
     parser.add_argument("--workspace", type=Path, default=DEFAULT_WORKSPACE)
     parser.add_argument("--date", default=date.today().isoformat(), help="date recorded as fetched (YYYY-MM-DD)")
     args = parser.parse_args(argv)
@@ -370,12 +410,16 @@ def main(argv=None):
         sys.stdout.reconfigure(encoding="utf-8")
     if not args.keys and not args.url:
         parser.error("give posting keys or --url")
+    if args.check and args.force:
+        parser.error("--check saves nothing: --force does not apply")
     try:
-        results = run(args.keys, args.url, args.workspace, args.date, force=args.force)
+        results = run(args.keys, args.url, args.workspace, args.date, force=args.force, check=args.check)
     except (ConfigError, ValueError) as e:
         print(f"posting-fetch: {e}", file=sys.stderr)
         return 2
-    counts = {s: sum(r["status"] == s for r in results) for s in ("saved", "exists", "failed", "unsupported")}
+    statuses = ("open", "closed", "failed", "unsupported") if args.check else ("saved", "exists", "failed",
+                                                                              "unsupported")
+    counts = {s: sum(r["status"] == s for r in results) for s in statuses}
     print(json.dumps({"results": results, "counts": counts}, ensure_ascii=False, indent=2))
     return 0
 

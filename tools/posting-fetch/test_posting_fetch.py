@@ -169,6 +169,50 @@ class OtherPortals(Workspace):
         self.assertNotIn("Menu", text)
 
 
+class Check(Workspace):
+    """--check: is the posting still open? Nothing is saved or overwritten."""
+    GUEST = LinkedIn.GUEST
+    URL = OtherPortals.URL
+
+    def run_check(self, keys, pages):
+        web = FakeWeb(pages)
+        self.waits = []
+        return pf.run(list(keys), [], self.ws, TODAY, get=web, delay=0, sleep=self.waits.append, check=True), web
+
+    def test_open_closed_and_gone(self):
+        closed = LINKEDIN.replace("<section class=\"core-section", "<figure class=\"closed-job\">No longer accepting "
+                                  "applications</figure><section class=\"core-section")
+        expired = JSONLD.replace("2026-12-31", "2026-11-01")
+        cases = [(LINKEDIN, JSONLD, ["open", "open"]), (closed, expired, ["closed", "closed"]),
+                 (None, None, ["closed", "closed"])]
+        for linkedin, ats, expected in cases:
+            with self.subTest(expected):
+                pages = {k: v for k, v in ((self.GUEST, linkedin), (self.URL, ats)) if v}
+                results, _ = self.run_check(["linkedin-9900000110", "greenhouse-4100000001"], pages)
+                self.assertEqual([r["status"] for r in results], expected)
+        self.assertIn("HTTP 404", results[0]["reason"])
+
+    def test_saved_posting_is_left_alone(self):
+        saved = self.ws / "jobs" / "postings" / "linkedin-9900000110.md"
+        saved.parent.mkdir()
+        saved.write_text("analysis", encoding="utf-8")
+        results, web = self.run_check(["linkedin-9900000110"], {self.GUEST: LINKEDIN})
+        self.assertEqual((results[0]["status"], len(web.requests)), ("open", 1))
+        self.assertEqual(saved.read_text(encoding="utf-8"), "analysis")
+        self.assertEqual(list(saved.parent.iterdir()), [saved])
+
+    def test_cannot_tell(self):
+        cases = {"login": ("https://www.linkedin.com/authwall?trk=x", LINKEDIN),
+                 "empty": "<html><body><p>Sign in to see this job</p></body></html>",
+                 "network": urllib.error.URLError("timed out")}
+        for name, page in cases.items():
+            with self.subTest(name):
+                results, _ = self.run_check(["linkedin-9900000110"], {self.GUEST: page})
+                self.assertEqual(results[0]["status"], "failed")
+        results, web = self.run_check(["experteer-ai-platform-engineer-barcelona"], {})
+        self.assertEqual((results[0]["status"], web.requests), ("unsupported", []))
+
+
 class UserLinks(Workspace):
     def test_linkedin_link_uses_the_guest_endpoint(self):
         url = "https://www.linkedin.com/jobs/view/senior-python-engineer-9900000110/?trackingId=abc&refId=x"

@@ -845,5 +845,222 @@ class Decisions(Workspace):
             jf.main(["--release-later", "--report", "--workspace", str(self.ws)])
 
 
+class Retention(Workspace):
+    """--prune: what is deleted and expired as time goes by, and seen.json never points to a missing file."""
+
+    def setUp(self):
+        super().setUp()
+        for d in ("mail/inbox", "jobs/extracted", "jobs/postings"):
+            (self.ws / d).mkdir(parents=True, exist_ok=True)
+
+    def mail(self, day, mail_id, type_="alert", status="processed"):
+        path = self.ws / "mail" / "inbox" / f"{day}-{mail_id}.md"
+        path.write_text(f'---\nid: "{mail_id}"\nstatus: "{status}"\ntype: "{type_}"\n---\n\nbody\n', encoding="utf-8")
+        return path
+
+    def extracted(self, name):
+        path = self.ws / "jobs" / "extracted" / name
+        path.write_text("[]", encoding="utf-8")
+        return path
+
+    def record(self, mail_id, day, *postings):
+        jf.filter_postings([(mail_id, list(postings))], self.criteria, self.seen, self.applications, day)
+
+    def analyse(self, key, day, saved=True, **fields):
+        if saved:
+            (self.ws / "jobs" / "postings" / f"{key}.md").write_text("card", encoding="utf-8")
+            fields.setdefault("posting_path", f"jobs/postings/{key}.md")
+        jf.set_fields(key, [f"{k}={v}" for k, v in fields.items()], self.seen, self.ws, day)
+
+    def entry(self, key):
+        return self.seen["postings"][key]
+
+    def test_alerts_and_saved_postings(self):
+        old, busy, recent = (self.mail("2026-11-01", "aaaaaaaaaaaa"), self.mail("2026-11-01", "bbbbbbbbbbbb"),
+                             self.mail("2026-11-15", "cccccccccccc"))
+        message = self.mail("2026-11-01", "dddddddddddd", type_="message", status="waiting")
+        self.record("aaaaaaaaaaaa", "2026-11-01",
+                    posting(job_id="7000001", url=None, company="Rejected", title="Junior Backend Engineer"),
+                    posting(job_id="7000002", url=None, company="Recommended Discard"),
+                    posting(job_id="7000003", url=None, company="User Discard"),
+                    posting(job_id="7000004", url=None, company="Discarded Today"))
+        self.record("bbbbbbbbbbbb", "2026-11-01", posting(job_id="7000005", url=None, company="In Queue"))
+        self.record("cccccccccccc", "2026-11-15", posting(job_id="7000006", url=None, company="Recent"))
+        self.analyse("linkedin-7000002", "2026-11-02", stage="analysed", recommendation="discard")
+        self.analyse("linkedin-7000003", "2026-11-02", stage="analysed", recommendation="apply")
+        jf.set_fields("linkedin-7000003", ["user_decision=discard"], self.seen, self.ws, "2026-11-02")
+        self.analyse("linkedin-7000004", "2026-11-02", stage="analysed", recommendation="apply")
+        jf.set_fields("linkedin-7000004", ["user_decision=discard"], self.seen, self.ws, "2026-11-20")
+        files = [self.extracted(n) for n in ("aaaaaaaaaaaa.json", "bbbbbbbbbbbb.json", "manual-2026-11-01-1.json",
+                                             "message-eeeeeeeeeeee.json", "message-dddddddddddd.json",
+                                             "recheck-linkedin-7000002.json")]
+
+        before = json.dumps(self.seen, sort_keys=True)
+        dry = jf.prune(self.seen, self.ws, "2026-11-20", dry_run=True)
+        self.assertEqual(json.dumps(self.seen, sort_keys=True), before)
+        self.assertTrue(all(p.exists() for p in files + [old]))
+
+        done = jf.prune(self.seen, self.ws, "2026-11-20")
+        self.assertEqual({k: v for k, v in done.items() if k != "dry_run"},
+                         {k: v for k, v in dry.items() if k != "dry_run"})
+        self.assertEqual([m["mail"] for m in done["mails_deleted"]], ["aaaaaaaaaaaa"])
+        self.assertEqual((old.exists(), busy.exists(), recent.exists(), message.exists()), (False, True, True, True))
+        self.assertEqual([(a["mail"], [b["company"] for b in a["blocked_by"]]) for a in done["alerts_waiting"]],
+                         [("bbbbbbbbbbbb", ["In Queue"])])
+        self.assertEqual(done["extracted_deleted"], ["manual-2026-11-01-1.json", "message-eeeeeeeeeeee.json",
+                                                     "recheck-linkedin-7000002.json"])
+        self.assertEqual([p.exists() for p in files], [False, True, False, False, True, False])
+        self.assertEqual([e["company"] for e in done["expired"]], ["Recommended Discard"])
+        self.assertEqual(sorted(e["company"] for e in done["postings_deleted"]), ["Recommended Discard", "User Discard"])
+        for key in ("linkedin-7000002", "linkedin-7000003"):
+            self.assertIsNone(self.entry(key)["posting_path"])
+            self.assertFalse((self.ws / "jobs" / "postings" / f"{key}.md").exists())
+        self.assertEqual(self.entry("linkedin-7000004")["posting_path"], "jobs/postings/linkedin-7000004.md")
+        self.assertEqual(jf.report(self.seen, "2026-11-20")["to_decide"], [])
+        # the second time there is nothing left to do
+        self.assertEqual(sum(v for k, v in jf.prune(self.seen, self.ws, "2026-11-20")["counts"].items()
+                             if k != "alerts_waiting"), 0)
+
+    def test_postings_to_apply_expire_when_closed_or_unchecked(self):
+        self.record("m1", "2026-11-01", *[posting(job_id=f"710000{i}", url=None, company=c) for i, c in
+                                          enumerate(["Closes", "Alias", "Stays Open", "Unsupported", "No Text",
+                                                     "To Apply"])])
+        for key in ("linkedin-7100000", "linkedin-7100002", "linkedin-7100003"):
+            self.analyse(key, "2026-11-01", stage="analysed", recommendation="apply")
+        self.analyse("linkedin-7100001", "2026-11-01", saved=False, stage="analysed", recommendation="apply",
+                     same_as="linkedin-7100000", posting_path="jobs/postings/linkedin-7100000.md")
+        self.analyse("linkedin-7100004", "2026-11-01", saved=False, stage="pending_text")
+        self.analyse("linkedin-7100005", "2026-11-01", stage="analysed", recommendation="apply_with_reservations")
+        jf.set_fields("linkedin-7100005", ["user_decision=apply"], self.seen, self.ws, "2026-11-01")
+
+        done = jf.prune(self.seen, self.ws, "2026-11-10")
+        self.assertEqual(done["to_check"] + done["expired"], [])
+        done = jf.prune(self.seen, self.ws, "2026-11-15")  # 14 days
+        self.assertEqual([e["company"] for e in done["to_check"]], ["Closes", "Stays Open", "Unsupported"])
+        jf.set_fields("linkedin-7100000", ["closed=true"], self.seen, self.ws, "2026-11-15")
+        jf.set_fields("linkedin-7100002", ["closed=false"], self.seen, self.ws, "2026-11-15")
+        done = jf.prune(self.seen, self.ws, "2026-11-15")
+        self.assertEqual([(e["company"], e["why"]) for e in done["expired"]],
+                         [("Closes", "the posting is closed"), ("Alias", "the posting is closed")])
+        self.assertEqual([e["company"] for e in done["to_check"]], ["Unsupported"])  # the other two are checked today
+        self.assertIsNone(self.entry("linkedin-7100001")["posting_path"])
+        self.assertFalse((self.ws / "jobs" / "postings" / "linkedin-7100000.md").exists())
+
+        done = jf.prune(self.seen, self.ws, "2026-11-25")  # 24 days: expiring soon (the open answer is 10 days old)
+        self.assertEqual([(e["company"], e["expires"]) for e in done["expiring_soon"]],
+                         [("Stays Open", "2026-12-01"), ("Unsupported", "2026-12-01"), ("No Text", "2026-12-01")])
+        data = jf.report(self.seen, "2026-11-25")  # the inbox shows the same dates
+        self.assertEqual({e["company"]: e["expires"] for e in data["to_decide"] + data["pending_text"]},
+                         {"Stays Open": "2026-12-01", "Unsupported": "2026-12-01", "No Text": "2026-12-01"})
+        jf.set_fields("linkedin-7100002", ["closed=false"], self.seen, self.ws, "2026-11-25")
+        done = jf.prune(self.seen, self.ws, "2026-12-01")  # 30 days
+        self.assertEqual([(e["company"], e["why"]) for e in done["expired"]],
+                         [("Unsupported", "not decided in 30 days and could not be checked"),
+                          ("No Text", "no text after 30 days")])
+        self.assertEqual([e["company"] for e in done["to_check"]], ["Stays Open"])
+        self.assertEqual(self.entry("linkedin-7100002")["stage"], "analysed")
+        self.assertEqual(self.entry("linkedin-7100005")["posting_path"], "jobs/postings/linkedin-7100005.md")
+        # an open posting whose checks keep failing falls back to the age rule a week after the last answer
+        self.assertEqual(jf.prune(self.seen, self.ws, "2026-12-02")["expired"], [])
+        done = jf.prune(self.seen, self.ws, "2026-12-03")
+        self.assertEqual([e["company"] for e in done["expired"]], ["Stays Open"])
+
+    def test_later_postings_are_undecided_after_release(self):
+        self.record("m1", "2026-11-01", posting(job_id="7200001", url=None, company="Later"))
+        self.analyse("linkedin-7200001", "2026-11-01", stage="analysed", recommendation="apply")
+        jf.set_fields("#1", ["user_decision=later"], self.seen, self.ws, "2026-11-01")
+        self.assertEqual(jf.prune(self.seen, self.ws, "2026-12-15")["expired"], [])
+        jf.release_later(self.seen)
+        self.assertEqual([e["company"] for e in jf.prune(self.seen, self.ws, "2026-12-15")["expired"]], ["Later"])
+
+    def test_missing_and_unreferenced_files(self):
+        self.record("m1", "2026-11-01", posting(job_id="7300001", url=None, company="Lost Card"),
+                    posting(job_id="7300002", url=None, company="Applied"))
+        self.analyse("linkedin-7300001", "2026-11-01", stage="analysed", recommendation="apply")
+        folder = self.ws / "output" / "applied-backend"
+        folder.mkdir(parents=True)
+        (folder / "job-posting.md").write_text("x", encoding="utf-8")
+        jf.set_fields("#2", ["user_decision=apply", "posting_path=output/applied-backend/job-posting.md"],
+                      self.seen, self.ws, "2026-11-01")
+        (self.ws / "jobs" / "postings" / "linkedin-7300001.md").unlink()
+        (folder / "job-posting.md").unlink()
+        (self.ws / "jobs" / "postings" / "stray.md").write_text("x", encoding="utf-8")
+        done = jf.prune(self.seen, self.ws, "2026-11-02")
+        self.assertEqual([e["company"] for e in done["missing_files"]], ["Lost Card", "Applied"])
+        self.assertEqual([e["company"] for e in done["requeued"]], ["Lost Card"])
+        self.assertEqual((self.entry("linkedin-7300001")["stage"], self.entry("linkedin-7300001")["posting_path"]),
+                         ("filtered", None))
+        self.assertEqual([e["company"] for e in jf.report(self.seen, "2026-11-02")["open"]], ["Lost Card"])
+        self.assertEqual(self.entry("linkedin-7300002")["posting_path"], "output/applied-backend/job-posting.md")
+        self.assertEqual(done["unreferenced_postings"], ["jobs/postings/stray.md"])
+        self.assertTrue((self.ws / "jobs" / "postings" / "stray.md").exists())
+
+    def test_text_of_a_posting_that_does_not_point_to_it(self):
+        self.record("m1", "2026-11-01", *[posting(job_id=f"750000{i}", url=None, company=c) for i, c in
+                                          enumerate(["Root", "Alias", "Discarded Unanalysed", "Being Analysed"])])
+        self.analyse("linkedin-7500000", "2026-11-01", stage="analysed", recommendation="apply")
+        for key in ("linkedin-7500001", "linkedin-7500002", "linkedin-7500003"):
+            (self.ws / "jobs" / "postings" / f"{key}.md").write_text("text", encoding="utf-8")
+        self.analyse("linkedin-7500001", "2026-11-01", saved=False, stage="analysed", recommendation="apply",
+                     same_as="linkedin-7500000", posting_path="jobs/postings/linkedin-7500000.md")
+        jf.set_fields("#3", ["user_decision=discard"], self.seen, self.ws, "2026-11-01")
+        done = jf.prune(self.seen, self.ws, "2026-11-05")
+        self.assertEqual([e["company"] for e in done["postings_deleted"]], ["Alias"])
+        done = jf.prune(self.seen, self.ws, "2026-11-11")
+        self.assertEqual([e["company"] for e in done["postings_deleted"]], ["Discarded Unanalysed"])
+        self.assertEqual(sorted(p.name for p in (self.ws / "jobs" / "postings").iterdir()),
+                         ["linkedin-7500000.md", "linkedin-7500003.md"])
+        self.assertEqual(done["unreferenced_postings"], [])
+
+    def test_cli(self):
+        self.record("aaaaaaaaaaaa", "2026-11-01", posting(job_id="7400001", url=None, title="Junior Backend Engineer"))
+        (self.ws / "jobs" / "seen.json").write_text(json.dumps(self.seen), encoding="utf-8")
+        alert = self.mail("2026-11-01", "aaaaaaaaaaaa")
+        code, out, err = run_cli("--prune", "--dry-run", "--workspace", self.ws, "--date", "2026-11-20")
+        self.assertEqual((code, json.loads(out)["counts"]["mails_deleted"], alert.exists()), (0, 1, True), err)
+        code, out, err = run_cli("--prune", "--workspace", self.ws, "--date", "2026-11-20")
+        self.assertEqual((code, alert.exists()), (0, False), err)
+        code, out, err = run_cli("--set", "#1", "closed=maybe", "--workspace", self.ws)
+        self.assertEqual(code, 2)
+        for argv in (["--dry-run", "--report"], ["--prune", "--calibration"]):
+            with self.subTest(argv), self.assertRaises(SystemExit), contextlib.redirect_stderr(io.StringIO()):
+                jf.main(argv + ["--workspace", str(self.ws)])
+
+
+class Calibration(Workspace):
+    """--calibration: the data behind proposals to change criteria.md."""
+
+    def test_decisions_other_family_and_rejections(self):
+        record = Report.record
+        record(self, posting(job_id="8000001", url=None, company="Presales One", title="Presales Engineer"),
+               posting(job_id="8000002", url=None, company="Applied Anyway"),
+               posting(job_id="8000003", url=None, company="Plain Discard"),
+               posting(job_id="8000004", url=None, company="Odd", title="Solutions Architect", role_family="other"),
+               posting(job_id="8000005", url=None, company="Junior", title="Junior Backend Engineer"),
+               posting(job_id="8000006", url=None, company="Presales One", title="Presales Engineer"),
+               posting(job_id="8000007", url=None, company="Old", title="Junior Data Engineer"), day=TODAY)
+        self.seen["postings"]["linkedin-8000007"]["filter"]["date"] = "2026-01-01"
+        jf.set_fields("#1", ["stage=analysed", "recommendation=apply", "user_decision=discard",
+                             "user_reason=presales"], self.seen, self.ws, TODAY)
+        jf.set_fields("#2", ["stage=analysed", "recommendation=discard", "user_decision=apply",
+                             "user_reason=AWS is fine"], self.seen, self.ws, TODAY)
+        jf.set_fields("#3", ["stage=analysed", "recommendation=discard", "user_decision=discard"], self.seen,
+                      self.ws, TODAY)
+        jf.set_fields("#6", ["same_as=linkedin-8000001"], self.seen, self.ws, TODAY)
+        data = jf.calibration(self.seen, TODAY)
+        self.assertEqual([(e["company"], e["user_decision"], e["user_reason"]) for e in data["against_recommendation"]],
+                         [("Presales One", "discard", "presales"), ("Applied Anyway", "apply", "AWS is fine")])
+        self.assertEqual([e["company"] for e in data["user_discards"]], ["Presales One", "Plain Discard"])
+        self.assertEqual([(e["company"], e["decision"]) for e in data["other_family"]], [("Odd", "maybe")])
+        self.assertEqual(data["rejections_by_rule"],
+                         {"title_exclude": {"count": 1, "examples": [{"n": 5, "title": "Junior Backend Engineer",
+                                                                      "company": "Junior", "reason": data[
+                                                                          "rejections_by_rule"]["title_exclude"][
+                                                                          "examples"][0]["reason"]}]}})
+        self.assertEqual(jf.calibration(self.seen, TODAY, days=400)["rejections_by_rule"]["title_exclude"]["count"], 2)
+        code, out, err = run_cli("--calibration", "--workspace", self.ws, "--date", TODAY)
+        self.assertEqual((code, json.loads(out)["counts"]["user_discards"]), (0, 0), err)  # no seen.json on disk
+
+
 if __name__ == "__main__":
     unittest.main()

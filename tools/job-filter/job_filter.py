@@ -13,6 +13,8 @@ Usage:
     uv run job_filter.py --report [--days 7]                 open postings and recent rejections, for the inbox
     uv run job_filter.py --set <key|#n> field=value...       record stage 2 results or the user's decision
     uv run job_filter.py --release-later                     'later' decisions back to undecided (start of a run)
+    uv run job_filter.py --prune [--dry-run]                 retention: expire postings, delete what nobody needs
+    uv run job_filter.py --calibration [--days 90]           decisions and rejections, to propose criteria changes
     (all of them take --workspace DIR, --criteria, --seen, --applications and --date YYYY-MM-DD)
 
 The model extracts and normalizes the postings of each job alert into
@@ -723,7 +725,7 @@ RECOMMENDATIONS = ["apply", "apply_with_reservations", "discard"]
 USER_DECISIONS = ["apply", "discard", "later"]
 FITS = ["high", "medium", "low"]
 SETTABLE = ["stage", "recommendation", "knockouts", "must_covered", "fit", "posting_path", "same_as",
-            "user_decision", "user_reason"]
+            "user_decision", "user_reason", "closed"]
 NULLS = {"", "null", "none"}
 # Shared by the postings of one job published twice (same_as): set on one, copied to the others.
 SHARED = ["user_decision", "user_reason", "user_decision_date", "posting_path"]
@@ -796,8 +798,14 @@ def set_fields(key, assignments, seen, workspace, today):
             if other is None or other == match:
                 raise ConfigError(f"same_as: '{value}' is not another posting in seen.json")
             changes[field] = other
+        elif field == "closed":  # what posting-fetch --check said
+            if value.lower() not in ("true", "false"):
+                raise ConfigError(f"closed: '{value}' is not true or false")
+            changes[field] = value.lower() == "true"
         else:  # user_reason: free text
             changes[field] = value
+    if "closed" in changes:
+        changes["closed_checked"] = today if changes["closed"] is not None else None
     if "stage" in changes and changes["stage"] != entry.get("stage"):
         changes["stage_date"] = today
     if "user_decision" in changes:
@@ -888,7 +896,8 @@ def report(seen, today, days=7, applications=()):
         stage2 = {"repost_of": f.get("repost_of") or [], "recommendation": entry.get("recommendation"),
                   "knockouts": entry.get("knockouts"), "must_covered": entry.get("must_covered"),
                   "fit": entry.get("fit"), "posting_path": entry.get("posting_path"),
-                  "same_as": entry.get("same_as"), "stage_date": entry.get("stage_date")}
+                  "same_as": entry.get("same_as"), "stage_date": entry.get("stage_date"),
+                  "expires": expiry_date(entry, seen["postings"], today)}
         section = None
         if entry.get("user_decision") == "apply":
             if not entry.get("same_as") and not (entry.get("posting_path") or "").startswith("output/"):
@@ -934,6 +943,296 @@ def report(seen, today, days=7, applications=()):
             "pending_text": pending, "filtered": filtered, "applied": applied, "counts": counts}
 
 
+# ---------------------------------------------------------------- retention (--prune)
+
+ALERT_DAYS = 10         # a processed alert is kept this long, and longer while a posting still needs it
+DISCARD_DAYS = 10       # the saved posting of a discard is kept this long (to undo the decision)
+PENDING_TEXT_DAYS = 30  # a posting whose text never came expires at this age
+CHECK_AFTER_DAYS = 14   # an analysed posting to apply to that nobody decided on is checked for being closed from here
+UNCHECKED_DAYS = 30     # ...and expires at this age if it could not be checked
+WARN_DAYS = 7           # expiring within this many days: listed so the summary can warn
+POSTINGS_DIR = "jobs/postings/"
+PRUNE_LISTS = ["expired", "postings_deleted", "mails_deleted", "extracted_deleted", "requeued", "missing_files",
+               "unreferenced_postings", "alerts_waiting", "to_check", "expiring_soon"]
+
+
+def _age(day, today):
+    """Days from `day` to `today`, or None when `day` is not a date."""
+    start = _ordinal(day)
+    return _ordinal(today) - start if start else None
+
+
+def read_mail_header(path):
+    """The front matter of a mail file written by mail-fetch (one `key: JSON value` per line)."""
+    try:
+        text = Path(path).read_text(encoding="utf-8")
+    except OSError:
+        return {}
+    match = re.match(r"---\r?\n(.*?)\r?\n---", text, re.S)
+    fm = {}
+    for line in (match.group(1).splitlines() if match else []):
+        key, sep, value = line.partition(":")
+        if not sep or not re.fullmatch(r"[A-Za-z_]+", key.strip()):
+            continue
+        value = value.strip()
+        try:
+            fm[key.strip()] = json.loads(value)
+        except ValueError:
+            fm[key.strip()] = value.strip("\"'")
+    return fm
+
+
+def expiry_date(entry, postings, today):
+    """The day an undecided posting will expire under --prune if nothing changes, or None: decided,
+    an alias, not waiting in stage 2, or a posting to apply to that was open when last checked."""
+    if entry.get("user_decision") or entry.get("same_as") in postings \
+            or entry.get("stage") not in ("pending_text", "analysed"):
+        return None
+    start = entry.get("stage_date") or entry.get("first_seen")
+    if not _ordinal(start):
+        return None
+    if entry["stage"] == "pending_text":
+        days = PENDING_TEXT_DAYS
+    elif entry.get("recommendation") == "discard":
+        days = DISCARD_DAYS
+    elif entry.get("closed") is True:
+        return today
+    else:
+        checked_age = _age(entry.get("closed_checked"), today)
+        if entry.get("closed") is False and checked_age is not None and checked_age <= WARN_DAYS:
+            return None
+        days = UNCHECKED_DAYS
+    return date.fromordinal(max(_ordinal(start) + days, _ordinal(today))).isoformat()
+
+
+def _brief(key, entry, **extra):
+    return {"n": entry.get("n"), "key": key, "company": entry.get("company"), "title": entry.get("title"), **extra}
+
+
+def _done_with_mail(entry):
+    """The posting no longer needs its alert: stage 1 dropped it, stage 2 is over, or the user decided."""
+    if entry.get("user_decision"):
+        return True
+    if entry.get("stage") in ("analysed", "expired"):
+        return True
+    if entry.get("stage") == "pending_text":
+        return False
+    return (entry.get("filter") or {}).get("decision") in ("reject", "duplicate")
+
+
+def prune(seen, workspace, today, dry_run=False):
+    """Retention (spec §5.1.1, decision 18): expire postings, delete the saved postings, alerts and
+    extracted files nobody needs any more, and fix seen.json where it points to a missing file.
+
+    Changes `seen` in place (unless dry_run) and deletes files (unless dry_run). Returns what it did,
+    plus `to_check`: analysed postings to apply to, undecided, old enough to ask posting-fetch --check
+    whether they closed; record the answer with --set <key> closed=true|false and run --prune again.
+    """
+    ws = Path(workspace)
+    if dry_run:
+        seen = json.loads(json.dumps(seen))
+    postings = seen["postings"]
+    out = {"date": today, "dry_run": dry_run, **{name: [] for name in PRUNE_LISTS}}
+
+    def delete(path):
+        if not dry_run:
+            path.unlink(missing_ok=True)
+
+    # 1. seen.json must not point to a file that is gone
+    for key, e in postings.items():
+        rel = e.get("posting_path")
+        if not rel or (ws / rel).is_file():
+            continue
+        out["missing_files"].append(_brief(key, e, path=rel))
+        if not rel.startswith(POSTINGS_DIR):
+            continue  # an application folder: cv-tailor's, left as it is
+        e["posting_path"] = None
+        if not e.get("user_decision") and e.get("stage") == "analysed":
+            e.update(stage="filtered", stage_date=today)  # its card is gone: back to the stage 2 queue
+            out["requeued"].append(_brief(key, e))
+
+    # 2. postings nobody decided on expire
+    def expire(key, why):
+        for k in same_job(key, postings):
+            e = postings[k]
+            if e.get("stage") != "expired" and not e.get("user_decision"):
+                e.update(stage="expired", stage_date=today, expired_reason=why)
+                out["expired"].append(_brief(k, e, why=why))
+
+    def soon(key, e, start, days):
+        expires = date.fromordinal(_ordinal(start) + days).isoformat()
+        out["expiring_soon"].append(_brief(key, e, expires=expires, recommendation=e.get("recommendation"),
+                                           stage=e.get("stage")))
+
+    for key, e in list(postings.items()):
+        if e.get("user_decision") or e.get("same_as") in postings or e.get("stage") not in ("pending_text",
+                                                                                            "analysed"):
+            continue
+        start = e.get("stage_date") or e.get("first_seen")
+        age = _age(start, today)
+        if age is None:
+            continue
+        if e["stage"] == "pending_text":
+            if age >= PENDING_TEXT_DAYS:
+                expire(key, f"no text after {PENDING_TEXT_DAYS} days")
+            elif age >= PENDING_TEXT_DAYS - WARN_DAYS:
+                soon(key, e, start, PENDING_TEXT_DAYS)
+            continue
+        if e.get("recommendation") == "discard":
+            if age >= DISCARD_DAYS:
+                expire(key, f"recommended discard, not decided in {DISCARD_DAYS} days")
+            continue
+        if e.get("closed") is True:
+            expire(key, "the posting is closed")
+            continue
+        checked_age = _age(e.get("closed_checked"), today)
+        if e.get("closed") is False and checked_age is not None and checked_age <= WARN_DAYS:
+            if checked_age > 0:  # open when last checked: check again, it does not expire by age
+                out["to_check"].append(_brief(key, e, url=e.get("url"), age=age))
+            continue
+        if age >= UNCHECKED_DAYS:
+            expire(key, f"not decided in {UNCHECKED_DAYS} days and could not be checked")
+            continue
+        if age >= CHECK_AFTER_DAYS and checked_age != 0:
+            out["to_check"].append(_brief(key, e, url=e.get("url"), age=age))
+        if age >= UNCHECKED_DAYS - WARN_DAYS:
+            soon(key, e, start, UNCHECKED_DAYS)
+
+    # 3. saved postings nobody needs: expired undecided, or discarded by the user DISCARD_DAYS ago
+    deleted_postings = set()
+    for key, e in postings.items():
+        rel = e.get("posting_path")
+        if not rel or not rel.startswith(POSTINGS_DIR) or e.get("user_decision") == "apply":
+            continue
+        discarded = e.get("user_decision") == "discard" and (_age(e.get("user_decision_date"), today) or 0) \
+            >= DISCARD_DAYS
+        if not (discarded or (e.get("stage") == "expired" and not e.get("user_decision"))):
+            continue
+        for other in postings.values():  # the aliases of the same job share the file
+            if other.get("posting_path") == rel:
+                other["posting_path"] = None
+        if rel not in deleted_postings:
+            deleted_postings.add(rel)
+            delete(ws / rel)
+            out["postings_deleted"].append(_brief(key, e, path=rel))
+
+    # 4. alerts: ALERT_DAYS after they arrived, once every posting in them is done with the mail
+    by_mail = {}
+    for key, e in postings.items():
+        for mail_id in e.get("mail_ids") or []:
+            by_mail.setdefault(mail_id, []).append(key)
+    inbox = ws / "mail" / "inbox"
+    mail_ids_left = set()
+    for path in sorted(inbox.glob("*.md")) if inbox.is_dir() else []:
+        match = re.fullmatch(r"(\d{4}-\d{2}-\d{2})-(\w+)", path.stem)
+        if not match:
+            continue
+        mail_id = match.group(2)
+        mail_ids_left.add(mail_id)
+        age = _age(match.group(1), today)
+        if age is None or age < ALERT_DAYS:
+            continue
+        fm = read_mail_header(path)
+        if fm.get("type") != "alert" or fm.get("status") != "processed":
+            continue
+        keys = by_mail.get(mail_id, [])
+        blocking = [k for k in keys if not _done_with_mail(postings[k])]
+        if blocking:
+            out["alerts_waiting"].append({"mail": mail_id, "file": path.name, "blocked_by": [
+                _brief(k, postings[k], stage=postings[k].get("stage")) for k in blocking]})
+            continue
+        delete(path)
+        delete(ws / "jobs" / "extracted" / f"{mail_id}.json")
+        mail_ids_left.discard(mail_id)
+        out["mails_deleted"].append({"mail": mail_id, "file": path.name, "postings": len(keys)})
+
+    # 5. extracted files left without their mail (and leftovers of manual postings and second passes)
+    extracted = ws / "jobs" / "extracted"
+    for path in sorted(extracted.glob("*.json")) if extracted.is_dir() and inbox.is_dir() else []:
+        stem = path.stem
+        if stem.startswith(("manual-", "recheck-")) or stem.removeprefix("message-") not in mail_ids_left:
+            if not any(m["mail"] == stem for m in out["mails_deleted"]):
+                delete(path)
+                out["extracted_deleted"].append(path.name)
+
+    # 6. saved postings no entry points to. The text of a posting in seen.json that does not need it any
+    # more (an alias that uses the other posting's card, a discard or an expired posting, by the rules of
+    # step 3) is deleted; one still on its way through stage 2 is kept (the analysis reuses it); a file
+    # of a posting that is not in seen.json is only reported.
+    referenced = {e.get("posting_path") for e in postings.values()}
+    folder = ws / POSTINGS_DIR
+    for path in sorted(folder.glob("*.md")) if folder.is_dir() else []:
+        rel = POSTINGS_DIR + path.name
+        if rel in referenced or rel in deleted_postings:
+            continue
+        key = find_key(path.stem, postings)
+        if key is None:
+            out["unreferenced_postings"].append(rel)
+            continue
+        e = postings[key]
+        discarded = e.get("user_decision") == "discard" and (_age(e.get("user_decision_date"), today) or 0) \
+            >= DISCARD_DAYS
+        if e.get("same_as") in postings or discarded or (e.get("stage") == "expired" and not e.get("user_decision")):
+            deleted_postings.add(rel)
+            delete(path)
+            out["postings_deleted"].append(_brief(key, e, path=rel))
+
+    out["to_check"].sort(key=lambda x: (x["n"] or 0, x["key"]))
+    out["expiring_soon"].sort(key=lambda x: (x["expires"], x["n"] or 0))
+    out["counts"] = {name: len(out[name]) for name in PRUNE_LISTS}
+    return out
+
+
+# ---------------------------------------------------------------- calibration (--calibration)
+
+CALIBRATION_FIELDS = ["title", "title_en", "company", "role_family", "seniority", "modality", "country", "city",
+                      "contract"]
+MAX_EXAMPLES = 10
+
+
+def calibration(seen, today, days=90):
+    """What the skill needs to propose changes to criteria.md, from the last `days` days of seen.json,
+    without reading it whole. Postings with same_as are left out (their decision is the other one's).
+
+    against_recommendation: the user's apply/discard that contradicts the recommendation, with the reason.
+    user_discards: every posting the user discarded, with the reason.
+    other_family: postings whose role_family is other or null (candidates for a new family).
+    rejections_by_rule: stage 1 rejections per rule_id, with a few examples.
+    """
+    since = date.fromordinal(_ordinal(today) - days).isoformat()
+    postings = seen["postings"]
+    against, discards, other, rejections = [], [], [], {}
+    for key, e in postings.items():
+        if e.get("same_as") in postings:
+            continue
+        f = e.get("filter") or {}
+        base = {"n": e.get("n"), "key": key, **{field: e.get(field) for field in CALIBRATION_FIELDS}}
+        decision, rec = e.get("user_decision"), e.get("recommendation")
+        if decision in ("apply", "discard") and (e.get("user_decision_date") or "") >= since:
+            item = {**base, "user_decision": decision, "user_reason": e.get("user_reason"),
+                    "user_decision_date": e.get("user_decision_date"), "recommendation": rec,
+                    "rule_id": f.get("rule_id") if f.get("decision") == "reject" else None}
+            if decision == "discard":
+                discards.append(item)
+            if (decision == "apply" and rec == "discard") or (decision == "discard" and rec in RECOMMENDATIONS[:2]):
+                against.append(item)
+        if e.get("role_family") in (None, "other") and f.get("decision") != "duplicate" \
+                and (e.get("first_seen") or "") >= since:
+            other.append({**base, "decision": f.get("decision")})
+        if f.get("decision") == "reject" and (f.get("date") or "") >= since:
+            rule = rejections.setdefault(f.get("rule_id") or "?", {"count": 0, "examples": []})
+            rule["count"] += 1
+            if len(rule["examples"]) < MAX_EXAMPLES:
+                rule["examples"].append({"n": e.get("n"), "title": e.get("title"), "company": e.get("company"),
+                                         "reason": f.get("reason")})
+    for items in (against, discards, other):
+        items.sort(key=lambda x: (x["n"] or 0, x["key"]))
+    return {"date": today, "days": days, "against_recommendation": against, "user_discards": discards,
+            "other_family": other, "rejections_by_rule": dict(sorted(rejections.items())),
+            "counts": {"against_recommendation": len(against), "user_discards": len(discards),
+                       "other_family": len(other)}}
+
+
 # ---------------------------------------------------------------- CLI
 
 def read_batches(paths):
@@ -963,7 +1262,13 @@ def main(argv=None):
                              + ", ".join(SETTABLE) + " (value null clears a field); KEY may be the number, #23")
     parser.add_argument("--release-later", action="store_true",
                         help="clear every 'later' decision, so those postings are to decide again (start of a run)")
-    parser.add_argument("--days", type=int, default=7, help="--report: rejections of the last N days (default 7)")
+    parser.add_argument("--prune", action="store_true",
+                        help="retention: expire postings, delete old alerts and saved postings nobody needs (start of a run)")
+    parser.add_argument("--dry-run", action="store_true", help="--prune: say what it would do, change nothing")
+    parser.add_argument("--calibration", action="store_true",
+                        help="decisions, discards, role_family other and rejections, to propose changes to criteria.md")
+    parser.add_argument("--days", type=int,
+                        help="--report: rejections of the last N days (default 7); --calibration: last N days (default 90)")
     parser.add_argument("--update-seen", action="store_true", help="record the results in seen.json")
     parser.add_argument("--recheck", action="store_true",
                         help="second pass (stage 2): judge postings already in seen.json again, merged with the new fields")
@@ -982,12 +1287,14 @@ def main(argv=None):
     if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", args.date) or not _ordinal(args.date):
         parser.error("--date must be YYYY-MM-DD")
     if sum((bool(args.explain), bool(args.report), bool(args.extracted), bool(args.set_fields),
-            args.release_later)) != 1:
-        parser.error("give extracted .json files, --explain KEY, --report, --set KEY FIELD=VALUE... "
-                     "or --release-later")
+            args.release_later, args.prune, args.calibration)) != 1:
+        parser.error("give extracted .json files, --explain KEY, --report, --set KEY FIELD=VALUE..., "
+                     "--release-later, --prune or --calibration")
     if args.set_fields and len(args.set_fields) < 2:
         parser.error("--set needs a posting key and at least one FIELD=VALUE")
-    if args.days < 0:
+    if args.dry_run and not args.prune:
+        parser.error("--dry-run goes with --prune")
+    if args.days is not None and args.days < 0:
         parser.error("--days must be 0 or more")
     try:
         if not Path(criteria_path).exists():
@@ -1000,8 +1307,19 @@ def main(argv=None):
             print(explain(args.explain, criteria, seen))
             return 0
         if args.report:
-            print(json.dumps(report(seen, args.date, args.days, read_applications(applications_path)),
+            days = 7 if args.days is None else args.days
+            print(json.dumps(report(seen, args.date, days, read_applications(applications_path)),
                              ensure_ascii=False, indent=2))
+            return 0
+        if args.prune:
+            done = prune(seen, args.workspace, args.date, dry_run=args.dry_run)
+            if not args.dry_run:
+                save_seen(seen_path, seen)
+            print(json.dumps(done, ensure_ascii=False, indent=2))
+            return 0
+        if args.calibration:
+            days = 90 if args.days is None else args.days
+            print(json.dumps(calibration(seen, args.date, days), ensure_ascii=False, indent=2))
             return 0
         if args.release_later:
             released = release_later(seen)

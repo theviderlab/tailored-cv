@@ -125,6 +125,7 @@ With `--update-seen`, each posting is recorded under its key in `workspace/jobs/
 | `posting_path` | The saved posting, relative to the workspace; it must exist |
 | `same_as` | Another key in `seen.json`: the same job posted twice, which shares its analysis |
 | `user_decision`, `user_reason` | `apply` · `discard` · `later`, and why. Records `user_decision_date`; a new decision without a reason clears the old reason. |
+| `closed` | `true` · `false`: what `posting-fetch --check` said. Records `closed_checked`. |
 
 `user_decision`, `user_reason` and `posting_path` are shared by the postings of one job: set on a posting, they are copied to every posting whose `same_as` points to it; set on one with `same_as`, to the posting it points to and its other aliases.
 
@@ -165,6 +166,27 @@ The other lists leave out the postings you have decided on and the expired ones:
 - `applied`: postings that would be in `to_apply`, `to_decide`, `open` or `pending_text` but already have a row in `applications.md` (same job ID from the row's link, or same company and role), with that row. This covers an application made outside `cv-tailor` (Easy Apply, the company's site): the posting leaves the other lists as soon as its row is added.
 - `counts`: how many of each.
 
+Items of `to_decide` and `pending_text` carry `expires`: the day `--prune` will expire them if nothing changes (`null` when it cannot tell, e.g. a posting to apply to that was open when last checked).
+
+## `--prune`
+
+Retention, run by the skill at the start of each full run (after `--release-later`). The mail is only the vehicle: once a posting has been filtered or analysed, what matters is in `seen.json`, the saved posting and the application folder. `--dry-run` says what it would do and changes nothing; `--date` simulates another day.
+
+| What | When |
+|---|---|
+| A processed job alert in `mail/inbox/` and its `jobs/extracted/<mail-id>.json` | 10 days after the date in its file name, once every posting in it is done with it: rejected or duplicate in stage 1, analysed, expired or decided on. Postings still in the stage 2 queue or waiting for their text keep it (`alerts_waiting`). |
+| A posting waiting for its text (`pending_text`) | Expires 30 days after it got there |
+| An analysed posting recommended `discard` that you did not decide on | Expires 10 days after the analysis |
+| An analysed posting recommended `apply` / `apply_with_reservations` that you did not decide on (also `later`, which is released before) | From 14 days after the analysis it is listed in `to_check`: the skill asks `posting-fetch --check`, records the answer with `--set <key> closed=true\|false` and runs `--prune` again. It expires when it is closed. One that cannot be checked (no supported link, or the checks keep failing for a week) expires at 30 days. |
+| The saved posting (`jobs/postings/<key>.md`) | Deleted when the posting expires, 10 days after you discarded it, or right away for an alias (`same_as`) that uses the other posting's card. `posting_path` is cleared. Postings you applied to are never touched. |
+| `jobs/extracted/*.json` without its mail, and leftovers (`manual-*`, `recheck-*`) | Deleted |
+
+An expired posting keeps its fields and gets `expired_reason`; it leaves the inbox but is still deduplicated, and you can still decide on it by number. A posting whose `posting_path` points to a missing file gets it cleared (`missing_files`); if it was analysed and undecided, it goes back to the stage 2 queue (`requeued`). A saved posting of a key that is not in `seen.json` is only reported (`unreferenced_postings`). `expiring_soon` lists the postings that expire within 7 days, so the skill can warn you. Messages and process updates are never touched: the skill deletes them when they are resolved.
+
+## `--calibration`
+
+What the skill needs to propose changes to `criteria.md`, from the last `--days` days (default 90), without reading `seen.json` whole: `against_recommendation` (your apply or discard against the recommendation, with your reason), `user_discards`, `other_family` (postings with `role_family` other or null: candidates for a new family) and `rejections_by_rule` (stage 1 rejections per rule, with up to 10 examples). It never writes anything; the skill proposes, and changes `criteria.md` only when you agree.
+
 ## Tests
 
 ```sh
@@ -172,4 +194,4 @@ python -m pip install pyyaml   # once
 python -m unittest discover -s tools/job-filter -v
 ```
 
-They filter the demo postings in [`examples/alex-morgan/jobs/extracted/`](../../examples/alex-morgan/jobs/extracted/) against Alex's criteria and application log, checking the outcomes listed in [`examples/alex-morgan/eml/README.md`](../../examples/alex-morgan/eml/README.md), and cover each rule, yearly conversion, regions, invalid values, `duplicate` vs `repost`, the second pass, `--explain` after the mail is gone, the report, permanent numbers and your decisions (`same_as`, `to_apply`, `--release-later`). They run in CI.
+They filter the demo postings in [`examples/alex-morgan/jobs/extracted/`](../../examples/alex-morgan/jobs/extracted/) against Alex's criteria and application log, checking the outcomes listed in [`examples/alex-morgan/eml/README.md`](../../examples/alex-morgan/eml/README.md), and cover each rule, yearly conversion, regions, invalid values, `duplicate` vs `repost`, the second pass, `--explain` after the mail is gone, the report, permanent numbers and your decisions (`same_as`, `to_apply`, `--release-later`), retention as time goes by (`--prune`) and `--calibration`. They run in CI.
